@@ -10,9 +10,9 @@ export const GlWorkshop: FC = () => {
   const [config, setConfig] = useState<ExplosionConfig>({
     particleCount: 300,
     explosionDuration: 0.05,
-    explosionForce: 50, // Reduced for better visibility
+    explosionForce: 75, // Reduced for better visibility
     particleRadius: 0.3,
-    settlingDuration: 8,
+    settlingDuration: 5,
     swingAmplitude: 150,
     fallSpeed: 1.5,
     gravity: 5,

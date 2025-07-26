@@ -355,7 +355,7 @@ export class GlRenderer {
 
     // Generate circle vertices
     const segments = 64; // Number of segments to approximate the circle
-    const radius = 100; // Circle radius in pixels
+    const radius = 75; // Circle radius in pixels
 
     // Don't generate particles here - they will be created by triggerBombExplosion
 
