@@ -169,11 +169,15 @@ export const FragmentShaderSource = `
     float metallic = u_metallic;
     float roughness = max(u_roughness, 0.001);
     
+    // Dramatic gold color for cave-like shine
+    vec3 goldTint = vec3(1.0, 0.85, 0.2);
+    baseColor = mix(baseColor, goldTint, 0.7);
+    
     // Calculate F0 (base reflectivity)
     vec3 F0 = mix(vec3(0.04), baseColor, metallic);
     
-    // Ambient lighting (minimal for metallic surfaces)
-    vec3 ambient = baseColor * 0.1;
+    // Ambient lighting (very low for cave effect)
+    vec3 ambient = baseColor * 0.03;
     
     // Dual-sided lighting - calculate for both front and back faces
     vec3 normalFront = normal;
@@ -185,7 +189,7 @@ export const FragmentShaderSource = `
     
     // Back face lighting (dual-sided reflection)
     float NdotL_back = max(dot(normalBack, lightDir), 0.0);
-    vec3 diffuse_back = baseColor * NdotL_back * (1.0 - metallic) * 0.8; // Slightly dimmer
+    vec3 diffuse_back = baseColor * NdotL_back * (1.0 - metallic) * 0.2; // Much dimmer
     
     // Combine front and back diffuse
     vec3 diffuse = diffuse_front + diffuse_back;
@@ -211,43 +215,43 @@ export const FragmentShaderSource = `
     vec3 specular_back = numerator_back / denominator_back;
     
     // Combine front and back specular
-    vec3 specular = specular_front + specular_back * 0.6; // Back specular slightly dimmer
+    vec3 specular = specular_front + specular_back * 0.1; // Minimal back specular
     
     // Combine lighting
-    vec3 Lo = (diffuse + specular) * 10.0; // Much higher intensity for bigger reflection
+    vec3 Lo = (diffuse + specular) * 30.0; // Higher intensity for golden shine
     
     // Final color
     vec3 color = ambient + Lo;
     
-    // Dual-sided metallic reflection
-    if (metallic > 0.5) {
-      // Front reflection
+    // ENHANCED GOLDEN REFLECTION - Like gold in a dark cave
+    if (metallic > 0.8) {
+      // Front reflection - strong golden shine on lit side
       vec3 reflection_front = reflect(-viewDir, normalFront);
-      float reflectionIntensity_front = pow(1.0 - roughness, 1.0); // Softer falloff for bigger reflection
-      color += reflectionIntensity_front * F0 * 3.0; // Much stronger reflection
+      float reflectionIntensity_front = pow(1.0 - roughness, 3.0); // Sharper reflections
+      color += reflectionIntensity_front * F0 * 18.0; // Much stronger front reflection
       
-      // Back reflection
+      // Back reflection - minimal for shadow effect
       vec3 reflection_back = reflect(-viewDir, normalBack);
-      float reflectionIntensity_back = pow(1.0 - roughness, 1.0); // Softer falloff for bigger reflection
-      color += reflectionIntensity_back * F0 * 1.8; // Stronger back reflection
+      float reflectionIntensity_back = pow(1.0 - roughness, 3.0);
+      color += reflectionIntensity_back * F0 * 0.2; // Minimal back reflection
     }
     
-    // Dual-sided rim lighting
+    // ENHANCED rim lighting for golden edge definition
     float rim_front = 1.0 - max(dot(normalFront, viewDir), 0.0);
     float rim_back = 1.0 - max(dot(normalBack, viewDir), 0.0);
-    rim_front = pow(rim_front, 1.0); // Softer rim for bigger effect
-    rim_back = pow(rim_back, 1.0); // Softer rim for bigger effect
-    color += (rim_front + rim_back * 0.7) * F0 * metallic * 1.5; // Stronger rim lighting
+    rim_front = pow(rim_front, 1.2);
+    rim_back = pow(rim_back, 1.2);
+    color += (rim_front + rim_back * 0.1) * F0 * metallic * 8.0; // Stronger rim lighting
     
-    // Much larger and softer specular highlights (big light source)
-    float specularHighlight_front = pow(max(dot(normalFront, halfwayDir_front), 0.0), 1.0 / (roughness * 0.1)); // Much softer for bigger highlights
-    float specularHighlight_back = pow(max(dot(normalBack, halfwayDir_back), 0.0), 1.0 / (roughness * 0.1)); // Much softer for bigger highlights
-    color += (specularHighlight_front + specularHighlight_back * 0.8) * F0 * 25.0; // Much brighter and larger highlights
+    // ENHANCED specular highlights for golden shine
+    float specularHighlight_front = pow(max(dot(normalFront, halfwayDir_front), 0.0), 1.0 / (roughness * 0.02));
+    float specularHighlight_back = pow(max(dot(normalBack, halfwayDir_back), 0.0), 1.0 / (roughness * 0.02));
+    color += (specularHighlight_front + specularHighlight_back * 0.2) * F0 * 80.0; // Much brighter highlights
     
-    // Add depth-based shading for chip-like structure
+    // Add depth-based shading for better 3D perception
     float depth = v_position.z;
-    float depthShading = 1.0 - (depth + 100.0) / 200.0; // Normalize depth
-    depthShading = clamp(depthShading, 0.3, 1.0);
+    float depthShading = 1.0 - (depth + 200.0) / 400.0;
+    depthShading = clamp(depthShading, 0.2, 1.0); // Lower minimum for darker shadows
     color *= depthShading;
     
     // Gamma correction

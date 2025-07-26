@@ -4,16 +4,26 @@ import { FragmentShaderSource, VertexShaderSource } from "./shaders";
 // Animation configuration interface
 export interface ExplosionConfig {
   particleCount: number;
-  explosionDuration: number; // 50ms for quick explosion
+  explosionDuration: number;
   explosionForce: number;
-  particleRadius: number;
+  particleRadiusMin: number;
+  particleRadiusMax: number;
   settlingDuration: number;
   swingAmplitude: number;
   fallSpeed: number;
   gravity: number;
   airResistance: number;
-  zScatter: number; // How much particles scatter on Z-axis
-  cameraDistance: number; // How far the camera is
+  zScatter: number;
+  cameraDistance: number;
+  centerX: number;
+  centerY: number;
+  minX: number;
+  maxX: number;
+  minY: number;
+  maxY: number;
+  metallic: number;
+  roughness: number;
+  goldColor: [number, number, number, number];
 }
 
 export class GlRenderer {
@@ -48,16 +58,26 @@ export class GlRenderer {
   // Default configuration
   private defaultConfig: ExplosionConfig = {
     particleCount: 300,
-    explosionDuration: 0.05, // 50ms explosion
-    explosionForce: 800, // Reduced for better visibility
-    particleRadius: 0.3,
-    settlingDuration: 8,
+    explosionDuration: 0.05,
+    explosionForce: 75,
+    particleRadiusMin: 0.2,
+    particleRadiusMax: 0.5,
+    settlingDuration: 5,
     swingAmplitude: 150,
     fallSpeed: 1.5,
     gravity: 5,
     airResistance: 0.98,
-    zScatter: 1000, // Reduced Z scatter
-    cameraDistance: 10000
+    zScatter: 1000,
+    cameraDistance: 10000,
+    centerX: 0.5, // normalized (0-1)
+    centerY: 0.8, // normalized (0-1)
+    minX: 0.1, // normalized (0-1)
+    maxX: 0.9, // normalized (0-1)
+    minY: 0.1, // normalized (0-1)
+    maxY: 0.95, // normalized (0-1)
+    metallic: 0.98,
+    roughness: 0.08,
+    goldColor: [1.0, 0.85, 0.2, 1.0],
   };
 
   constructor(gl: WebGLRenderingContext) {
@@ -139,6 +159,15 @@ export class GlRenderer {
       [0.9, 0.6, 0.2, 1.0],       // Light Gold
     ];
 
+    const canvasWidth = this.gl.canvas.width;
+    const canvasHeight = this.gl.canvas.height;
+    const minX = config.minX * canvasWidth;
+    const maxX = config.maxX * canvasWidth;
+    const minY = config.minY * canvasHeight;
+    const maxY = config.maxY * canvasHeight;
+    const explosionCenterX = (config.centerX ?? 0.5) * canvasWidth;
+    const explosionCenterY = (config.centerY ?? 0.8) * canvasHeight;
+
     for (let i = 0; i < config.particleCount; i++) {
       // Start from Z=-1000 (in front of camera)
       const startZ = -1000;
@@ -154,22 +183,28 @@ export class GlRenderer {
       const velocityZ = Math.cos(phi) * explosionRadius;
       
       // Calculate explosion end point in 3D space (ensure it's in front of camera)
-      const endX = burstX + velocityX;
-      const endY = burstY + velocityY;
+      let endX = explosionCenterX + velocityX;
+      let endY = explosionCenterY + velocityY;
       const endZ = startZ + velocityZ;
       
+      // Clamp endX, endY to user-specified bounds for 80% of particles
+      if (i < Math.floor(config.particleCount * 0.8)) {
+        endX = Math.max(minX, Math.min(maxX, endX));
+        endY = Math.max(minY, Math.min(maxY, endY));
+      }
+      
       // Control points for smooth explosion curve
-      const midX = burstX + velocityX * 0.3;
-      const midY = burstY + velocityY * 0.3;
-      const midZ = startZ + velocityZ * 0.3;
+      const midX = explosionCenterX + (endX - explosionCenterX) * 0.3;
+      const midY = explosionCenterY + (endY - explosionCenterY) * 0.3;
+      const midZ = startZ + (endZ - startZ) * 0.3;
       
       // Final settling position with swing (ensure it's below screen)
       const settleX = endX + (Math.random() - 0.5) * config.swingAmplitude;
-      const settleY = this.gl.canvas.height + 100; // Below screen
+      const settleY = canvasHeight + 100; // Below screen
       const settleZ = endZ + (Math.random() - 0.5) * config.zScatter * 0.1; // Minimal Z variation for settling
 
       // Particle properties
-      const radius = config.particleRadius + Math.random() * 0.2;
+      const radius = config.particleRadiusMin + Math.random() * (config.particleRadiusMax - config.particleRadiusMin);
       const scaleX = 0.04 + Math.random() * 0.12;
       const scaleY = 0.05 + Math.random() * 0.15;
 
@@ -188,8 +223,8 @@ export class GlRenderer {
       ];
 
       // Metallic properties for golden particles
-      const metallic = 0.95 + Math.random() * 0.05;
-      const roughness = 0.02 + Math.random() * 0.08;
+      const metallic = config.metallic;
+      const roughness = config.roughness;
 
       // Depth parameters for golden particle shape
       const depthA = 80.0 + Math.random() * 160.0;
@@ -205,15 +240,15 @@ export class GlRenderer {
         : 1200 + Math.random() * 600; // Longer for fall particles
 
       // Bezier control points for explosion + settling animation
-      const p0 = { x: burstX, y: burstY, z: startZ }; // Start at explosion center
+      const p0 = { x: explosionCenterX, y: explosionCenterY, z: startZ }; // Start at explosion center
       const p1 = { x: midX, y: midY, z: midZ }; // Mid explosion point
       const p2 = { x: endX, y: endY, z: endZ }; // End of explosion
       const p3 = { x: settleX, y: settleY, z: settleZ }; // Final settling position
 
       this.particles.push(
         new Particle(
-          burstX,
-          burstY,
+          explosionCenterX,
+          explosionCenterY,
           radius,
           rotationSpeedX,
           rotationSpeedY,

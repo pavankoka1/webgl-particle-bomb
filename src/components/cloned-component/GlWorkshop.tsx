@@ -10,15 +10,25 @@ export const GlWorkshop: FC = () => {
   const [config, setConfig] = useState<ExplosionConfig>({
     particleCount: 300,
     explosionDuration: 0.05,
-    explosionForce: 75, // Reduced for better visibility
-    particleRadius: 0.3,
+    explosionForce: 75,
+    particleRadiusMin: 0.2,
+    particleRadiusMax: 0.75,
     settlingDuration: 5,
     swingAmplitude: 150,
     fallSpeed: 1.5,
     gravity: 5,
     airResistance: 0.98,
-    zScatter: 1000, // Reduced Z scatter
-    cameraDistance: 10000
+    zScatter: 1000,
+    cameraDistance: 10000,
+    centerX: 0.5,
+    centerY: 0.8,
+    minX: 0.1,
+    maxX: 0.9,
+    minY: 0.1,
+    maxY: 0.95,
+    metallic: 0.98,
+    roughness: 0.08,
+    goldColor: [1.0, 0.85, 0.2, 1.0],
   });
 
   useEffect(() => {
@@ -224,20 +234,6 @@ export const GlWorkshop: FC = () => {
             </div>
 
             <div style={{ marginBottom: "15px" }}>
-              <label style={{ display: "block", marginBottom: "5px" }}>Particle Radius:</label>
-              <input
-                type="range"
-                min="0.1"
-                max="0.8"
-                step="0.1"
-                value={config.particleRadius}
-                onChange={(e) => setConfig(prev => ({ ...prev, particleRadius: parseFloat(e.target.value) }))}
-                style={{ width: "100%" }}
-              />
-              <span style={{ fontSize: "12px", color: "#ccc" }}>{config.particleRadius}</span>
-            </div>
-
-            <div style={{ marginBottom: "15px" }}>
               <label style={{ display: "block", marginBottom: "5px" }}>Settling Duration (seconds):</label>
               <input
                 type="range"
@@ -317,7 +313,7 @@ export const GlWorkshop: FC = () => {
               <span style={{ fontSize: "12px", color: "#ccc" }}>{config.zScatter}</span>
             </div>
 
-            <div style={{ marginBottom: "20px" }}>
+            <div style={{ marginBottom: "15px" }}>
               <label style={{ display: "block", marginBottom: "5px" }}>Camera Distance:</label>
               <input
                 type="range"
@@ -328,6 +324,163 @@ export const GlWorkshop: FC = () => {
                 style={{ width: "100%" }}
               />
               <span style={{ fontSize: "12px", color: "#ccc" }}>{config.cameraDistance}</span>
+            </div>
+
+            <div style={{ marginBottom: "15px" }}>
+              <label style={{ display: "block", marginBottom: "5px" }}>Center X:</label>
+              <input
+                type="range"
+                min="0"
+                max="1"
+                step="0.01"
+                value={config.centerX}
+                onChange={(e) => setConfig(prev => ({ ...prev, centerX: parseFloat(e.target.value) }))}
+                style={{ width: "100%" }}
+              />
+              <span style={{ fontSize: "12px", color: "#ccc" }}>{config.centerX.toFixed(2)}</span>
+            </div>
+
+            <div style={{ marginBottom: "15px" }}>
+              <label style={{ display: "block", marginBottom: "5px" }}>Center Y:</label>
+              <input
+                type="range"
+                min="0"
+                max="1"
+                step="0.01"
+                value={config.centerY}
+                onChange={(e) => setConfig(prev => ({ ...prev, centerY: parseFloat(e.target.value) }))}
+                style={{ width: "100%" }}
+              />
+              <span style={{ fontSize: "12px", color: "#ccc" }}>{config.centerY.toFixed(2)}</span>
+            </div>
+
+            <div style={{ marginBottom: "15px" }}>
+              <label style={{ display: "block", marginBottom: "5px" }}>Min X:</label>
+              <input
+                type="range"
+                min="0"
+                max="1"
+                step="0.01"
+                value={config.minX}
+                onChange={(e) => setConfig(prev => ({ ...prev, minX: parseFloat(e.target.value) }))}
+                style={{ width: "100%" }}
+              />
+              <span style={{ fontSize: "12px", color: "#ccc" }}>{config.minX.toFixed(2)}</span>
+            </div>
+
+            <div style={{ marginBottom: "15px" }}>
+              <label style={{ display: "block", marginBottom: "5px" }}>Max X:</label>
+              <input
+                type="range"
+                min="0"
+                max="1"
+                step="0.01"
+                value={config.maxX}
+                onChange={(e) => setConfig(prev => ({ ...prev, maxX: parseFloat(e.target.value) }))}
+                style={{ width: "100%" }}
+              />
+              <span style={{ fontSize: "12px", color: "#ccc" }}>{config.maxX.toFixed(2)}</span>
+            </div>
+
+            <div style={{ marginBottom: "15px" }}>
+              <label style={{ display: "block", marginBottom: "5px" }}>Min Y:</label>
+              <input
+                type="range"
+                min="0"
+                max="1"
+                step="0.01"
+                value={config.minY}
+                onChange={(e) => setConfig(prev => ({ ...prev, minY: parseFloat(e.target.value) }))}
+                style={{ width: "100%" }}
+              />
+              <span style={{ fontSize: "12px", color: "#ccc" }}>{config.minY.toFixed(2)}</span>
+            </div>
+
+            <div style={{ marginBottom: "15px" }}>
+              <label style={{ display: "block", marginBottom: "5px" }}>Max Y:</label>
+              <input
+                type="range"
+                min="0"
+                max="1"
+                step="0.01"
+                value={config.maxY}
+                onChange={(e) => setConfig(prev => ({ ...prev, maxY: parseFloat(e.target.value) }))}
+                style={{ width: "100%" }}
+              />
+              <span style={{ fontSize: "12px", color: "#ccc" }}>{config.maxY.toFixed(2)}</span>
+            </div>
+
+            <div style={{ marginBottom: "15px" }}>
+              <label style={{ display: "block", marginBottom: "5px" }}>Particle Radius Min:</label>
+              <input
+                type="range"
+                min="0.1"
+                max="0.8"
+                step="0.01"
+                value={config.particleRadiusMin}
+                onChange={(e) => setConfig(prev => ({ ...prev, particleRadiusMin: parseFloat(e.target.value) }))}
+                style={{ width: "100%" }}
+              />
+              <span style={{ fontSize: "12px", color: "#ccc" }}>{config.particleRadiusMin.toFixed(2)}</span>
+            </div>
+
+            <div style={{ marginBottom: "15px" }}>
+              <label style={{ display: "block", marginBottom: "5px" }}>Particle Radius Max:</label>
+              <input
+                type="range"
+                min="0.1"
+                max="0.8"
+                step="0.01"
+                value={config.particleRadiusMax}
+                onChange={(e) => setConfig(prev => ({ ...prev, particleRadiusMax: parseFloat(e.target.value) }))}
+                style={{ width: "100%" }}
+              />
+              <span style={{ fontSize: "12px", color: "#ccc" }}>{config.particleRadiusMax.toFixed(2)}</span>
+            </div>
+
+            <div style={{ marginBottom: "15px" }}>
+              <label style={{ display: "block", marginBottom: "5px" }}>Metallic:</label>
+              <input
+                type="range"
+                min="0"
+                max="1"
+                step="0.01"
+                value={config.metallic}
+                onChange={(e) => setConfig(prev => ({ ...prev, metallic: parseFloat(e.target.value) }))}
+                style={{ width: "100%" }}
+              />
+              <span style={{ fontSize: "12px", color: "#ccc" }}>{config.metallic.toFixed(2)}</span>
+            </div>
+
+            <div style={{ marginBottom: "15px" }}>
+              <label style={{ display: "block", marginBottom: "5px" }}>Roughness:</label>
+              <input
+                type="range"
+                min="0"
+                max="1"
+                step="0.01"
+                value={config.roughness}
+                onChange={(e) => setConfig(prev => ({ ...prev, roughness: parseFloat(e.target.value) }))}
+                style={{ width: "100%" }}
+              />
+              <span style={{ fontSize: "12px", color: "#ccc" }}>{config.roughness.toFixed(2)}</span>
+            </div>
+
+            <div style={{ marginBottom: "15px" }}>
+              <label style={{ display: "block", marginBottom: "5px" }}>Gold Color (R, G, B):</label>
+              <input
+                type="color"
+                value={`#${((1 << 24) + (Math.round(config.goldColor[0] * 255) << 16) + (Math.round(config.goldColor[1] * 255) << 8) + Math.round(config.goldColor[2] * 255)).toString(16).slice(1, 7)}`}
+                onChange={(e) => {
+                  const hex = e.target.value;
+                  const r = parseInt(hex.slice(1, 3), 16) / 255;
+                  const g = parseInt(hex.slice(3, 5), 16) / 255;
+                  const b = parseInt(hex.slice(5, 7), 16) / 255;
+                  setConfig(prev => ({ ...prev, goldColor: [r, g, b, 1.0] }));
+                }}
+                style={{ width: "100%", height: "30px" }}
+              />
+              <span style={{ fontSize: "12px", color: "#ccc" }}>{config.goldColor.map(c => c.toFixed(2)).join(", ")}</span>
             </div>
 
             <div style={{ display: "flex", gap: "10px", justifyContent: "flex-end" }}>
