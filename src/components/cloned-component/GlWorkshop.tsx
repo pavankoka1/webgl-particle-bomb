@@ -28,7 +28,7 @@ export const GlWorkshop: FC = () => {
     maxY: 0.95,
     metallic: 0.98,
     roughness: 0.08,
-    goldColor: [1.0, 0.85, 0.2, 1.0],
+    goldColor: [1.0, 0.866, 0.262, 1.0], // #FFDD43
   });
 
   useEffect(() => {

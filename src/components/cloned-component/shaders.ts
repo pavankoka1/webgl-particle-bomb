@@ -170,14 +170,14 @@ export const FragmentShaderSource = `
     float roughness = max(u_roughness, 0.001);
     
     // Dramatic gold color for cave-like shine
-    vec3 goldTint = vec3(1.0, 0.85, 0.2);
-    baseColor = mix(baseColor, goldTint, 0.7);
+    vec3 goldTint = u_color.rgb; // Use the input color as the main gold color
+    baseColor = mix(baseColor, goldTint, 1.0); // Use only the input color
     
     // Calculate F0 (base reflectivity)
-    vec3 F0 = mix(vec3(0.04), baseColor, metallic);
+    vec3 F0 = mix(vec3(0.2, 0.15, 0.05), baseColor, metallic); // more gold base reflectivity
     
     // Ambient lighting (very low for cave effect)
-    vec3 ambient = baseColor * 0.03;
+    vec3 ambient = baseColor * 0.01;
     
     // Dual-sided lighting - calculate for both front and back faces
     vec3 normalFront = normal;
@@ -218,40 +218,40 @@ export const FragmentShaderSource = `
     vec3 specular = specular_front + specular_back * 0.1; // Minimal back specular
     
     // Combine lighting
-    vec3 Lo = (diffuse + specular) * 30.0; // Higher intensity for golden shine
+    vec3 Lo = (diffuse + specular) * 50.0; // Even higher intensity for golden shine
     
-    // Final color
+    // Initialize final color
     vec3 color = ambient + Lo;
     
     // ENHANCED GOLDEN REFLECTION - Like gold in a dark cave
     if (metallic > 0.8) {
       // Front reflection - strong golden shine on lit side
       vec3 reflection_front = reflect(-viewDir, normalFront);
-      float reflectionIntensity_front = pow(1.0 - roughness, 3.0); // Sharper reflections
-      color += reflectionIntensity_front * F0 * 18.0; // Much stronger front reflection
+      float reflectionIntensity_front = pow(1.0 - roughness, 6.0); // Even sharper reflections
+      color += reflectionIntensity_front * F0 * 40.0; // Stronger front reflection
       
       // Back reflection - minimal for shadow effect
       vec3 reflection_back = reflect(-viewDir, normalBack);
-      float reflectionIntensity_back = pow(1.0 - roughness, 3.0);
-      color += reflectionIntensity_back * F0 * 0.2; // Minimal back reflection
+      float reflectionIntensity_back = pow(1.0 - roughness, 6.0);
+      color += reflectionIntensity_back * F0 * 0.08; // Minimal back reflection
     }
     
     // ENHANCED rim lighting for golden edge definition
     float rim_front = 1.0 - max(dot(normalFront, viewDir), 0.0);
     float rim_back = 1.0 - max(dot(normalBack, viewDir), 0.0);
-    rim_front = pow(rim_front, 1.2);
-    rim_back = pow(rim_back, 1.2);
-    color += (rim_front + rim_back * 0.1) * F0 * metallic * 8.0; // Stronger rim lighting
+    rim_front = pow(rim_front, 2.0);
+    rim_back = pow(rim_back, 2.0);
+    color += (rim_front + rim_back * 0.1) * F0 * metallic * 18.0; // Stronger rim lighting
     
     // ENHANCED specular highlights for golden shine
-    float specularHighlight_front = pow(max(dot(normalFront, halfwayDir_front), 0.0), 1.0 / (roughness * 0.02));
-    float specularHighlight_back = pow(max(dot(normalBack, halfwayDir_back), 0.0), 1.0 / (roughness * 0.02));
-    color += (specularHighlight_front + specularHighlight_back * 0.2) * F0 * 80.0; // Much brighter highlights
+    float specularHighlight_front = pow(max(dot(normalFront, halfwayDir_front), 0.0), 1.0 / (roughness * 0.008));
+    float specularHighlight_back = pow(max(dot(normalBack, halfwayDir_back), 0.0), 1.0 / (roughness * 0.008));
+    color += (specularHighlight_front + specularHighlight_back * 0.2) * F0 * 180.0; // Much brighter highlights
     
     // Add depth-based shading for better 3D perception
     float depth = v_position.z;
     float depthShading = 1.0 - (depth + 200.0) / 400.0;
-    depthShading = clamp(depthShading, 0.2, 1.0); // Lower minimum for darker shadows
+    depthShading = clamp(depthShading, 0.05, 1.0); // Allow for deep shadows
     color *= depthShading;
     
     // Gamma correction

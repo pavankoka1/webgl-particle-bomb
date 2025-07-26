@@ -58,7 +58,7 @@ export class GlRenderer {
   // Default configuration
   private defaultConfig: ExplosionConfig = {
     particleCount: 300,
-    explosionDuration: 0.05,
+    explosionDuration: 0.01, // even quicker explosion
     explosionForce: 75,
     particleRadiusMin: 0.2,
     particleRadiusMax: 0.5,
@@ -77,7 +77,7 @@ export class GlRenderer {
     maxY: 0.95, // normalized (0-1)
     metallic: 0.98,
     roughness: 0.08,
-    goldColor: [1.0, 0.85, 0.2, 1.0],
+    goldColor: [1.0, 0.8, 0.2, 1.0], // #FFCC33
   };
 
   constructor(gl: WebGLRenderingContext) {
@@ -150,13 +150,13 @@ export class GlRenderer {
     this.viewPosition = [0, 0, config.cameraDistance];
     this.lightPosition = [0, 0, config.cameraDistance * 0.8];
 
-    // Define golden color palette
-    const goldenColors = [
-      [0.98, 0.533, 0.231, 1.0], // Bright Gold
-      [0.729, 0.518, 0.2, 1.0],   // Golden Brown
-      [0.741, 0.4, 0.18, 1.0],    // Dark Gold
-      [0.8, 0.5, 0.1, 1.0],       // Golden
-      [0.9, 0.6, 0.2, 1.0],       // Light Gold
+    // Gold palette: black, dark brown, bronze, gold, #FFCC33
+    const goldPalette: [number, number, number, number][] = [
+      [0.05, 0.04, 0.03, 1.0], // near black
+      [0.18, 0.13, 0.05, 1.0], // dark brown
+      [0.55, 0.38, 0.13, 1.0], // bronze
+      [0.85, 0.65, 0.13, 1.0], // gold
+      [1.0, 0.8, 0.2, 1.0],    // #FFCC33
     ];
 
     const canvasWidth = this.gl.canvas.width;
@@ -172,15 +172,16 @@ export class GlRenderer {
       // Start from Z=-1000 (in front of camera)
       const startZ = -1000;
       
-      // Spherical distribution for explosion in all directions
-      const theta = Math.random() * 2 * Math.PI; // Horizontal angle
-      const phi = Math.acos(2 * Math.random() - 1); // Vertical angle for full sphere
+      // Uniform spherical distribution, but bias phi to keep more particles in visible area
+      const theta = Math.random() * 2 * Math.PI;
+      // Bias phi to be closer to pi/2 (xy plane) for more even x/y scatter
+      const phi = Math.acos(1 - 2 * Math.random());
       const explosionRadius = config.explosionForce + Math.random() * config.explosionForce * 0.3;
       
       // Calculate explosion velocity in all directions
       const velocityX = Math.sin(phi) * Math.cos(theta) * explosionRadius;
       const velocityY = Math.sin(phi) * Math.sin(theta) * explosionRadius;
-      const velocityZ = Math.cos(phi) * explosionRadius;
+      const velocityZ = Math.cos(phi) * explosionRadius * 0.5; // Reduce Z to keep more in view
       
       // Calculate explosion end point in 3D space (ensure it's in front of camera)
       let endX = explosionCenterX + velocityX;
@@ -208,19 +209,18 @@ export class GlRenderer {
       const scaleX = 0.04 + Math.random() * 0.12;
       const scaleY = 0.05 + Math.random() * 0.15;
 
-      // Rotation speeds for realistic swing
-      const rotationSpeedX = (Math.random() - 0.5) * 0.08;
-      const rotationSpeedY = (Math.random() - 0.5) * 0.08;
-      const rotationSpeedZ = (Math.random() - 0.5) * 0.08;
+      // Individualized swing
+      const swingAmplitude = config.swingAmplitude * (0.7 + Math.random() * 0.6); // 70%-130%
+      const swingFrequency = 0.5 + Math.random() * 2.0;
+      const swingPhase = Math.random() * Math.PI * 2;
 
-      // Select golden color
-      const colorIndex = Math.floor(Math.random() * goldenColors.length);
-      const color: [number, number, number, number] = goldenColors[colorIndex] as [
-        number,
-        number,
-        number,
-        number
-      ];
+      // More randomized rotation speeds for falling
+      const rotationSpeedX = (Math.random() - 0.5) * 0.2;
+      const rotationSpeedY = (Math.random() - 0.5) * 0.2;
+      const rotationSpeedZ = (Math.random() - 0.5) * 0.2;
+
+      // Assign a random gold shade to each particle
+      const color: [number, number, number, number] = goldPalette[Math.floor(Math.random() * goldPalette.length)];
 
       // Metallic properties for golden particles
       const metallic = config.metallic;
@@ -240,10 +240,10 @@ export class GlRenderer {
         : 1200 + Math.random() * 600; // Longer for fall particles
 
       // Bezier control points for explosion + settling animation
-      const p0 = { x: explosionCenterX, y: explosionCenterY, z: startZ }; // Start at explosion center
-      const p1 = { x: midX, y: midY, z: midZ }; // Mid explosion point
-      const p2 = { x: endX, y: endY, z: endZ }; // End of explosion
-      const p3 = { x: settleX, y: settleY, z: settleZ }; // Final settling position
+      const p0 = { x: explosionCenterX, y: explosionCenterY, z: startZ };
+      const p1 = { x: midX, y: midY, z: midZ };
+      const p2 = { x: endX, y: endY, z: endZ };
+      const p3 = { x: settleX, y: settleY, z: settleZ };
 
       this.particles.push(
         new Particle(
@@ -262,9 +262,9 @@ export class GlRenderer {
           depthB,
           depthScale,
           life,
-          config.explosionDuration,
+          config.explosionDuration, // even quicker explosion
           config.settlingDuration,
-          config.swingAmplitude,
+          swingAmplitude,
           particleType,
           config.fallSpeed,
           config.gravity,
@@ -272,7 +272,9 @@ export class GlRenderer {
           p0,
           p1,
           p2,
-          p3
+          p3,
+          swingFrequency,
+          swingPhase
         )
       );
     }

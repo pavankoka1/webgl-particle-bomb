@@ -45,7 +45,7 @@ export class Particle {
   // Swing properties
   swingAmplitude: number;
   swingFrequency: number;
-  swingPhase: number = 0;
+  swingPhase: number;
   fallSpeed: number;
   
   // Animation properties
@@ -79,7 +79,9 @@ export class Particle {
     p0?: { x: number; y: number; z: number },
     p1?: { x: number; y: number; z: number },
     p2?: { x: number; y: number; z: number },
-    p3?: { x: number; y: number; z: number }
+    p3?: { x: number; y: number; z: number },
+    swingFrequency: number = 1.0,
+    swingPhase: number = 0.0
   ) {
     this.centerX = centerX;
     this.centerY = centerY;
@@ -109,7 +111,8 @@ export class Particle {
     this.airResistance = airResistance;
     this.fallSpeed = fallSpeed;
     this.swingAmplitude = swingAmplitude;
-    this.swingFrequency = 0.5 + Math.random() * 1.0; // Random swing frequency
+    this.swingFrequency = swingFrequency;
+    this.swingPhase = swingPhase;
     
     // Calculate explosion velocities from Bezier points
     if (p0 && p1 && p2 && p3) {
@@ -177,8 +180,8 @@ export class Particle {
       
       // Apply swing motion (realistic leaf-like movement)
       const swingX = Math.sin(this.swingPhase) * this.swingAmplitude * 0.01;
-      const swingY = Math.cos(this.swingPhase * 0.7) * this.swingAmplitude * 0.005;
-      const swingZ = Math.sin(this.swingPhase * 0.5) * this.swingAmplitude * 0.001; // Reduced Z swing
+      const swingY = Math.cos(this.swingPhase * 0.7 + this.swingPhase) * this.swingAmplitude * 0.005;
+      const swingZ = Math.sin(this.swingPhase * 0.5 + this.swingPhase) * this.swingAmplitude * 0.001; // Reduced Z swing
       
       // Apply swing forces
       this.velocityX += swingX;
@@ -199,9 +202,9 @@ export class Particle {
       this.centerZ = Math.max(-2000, Math.min(500, this.centerZ));
       
       // Realistic rotation during fall
-      this.rotationX += this.rotationSpeedX * 0.5;
-      this.rotationY += this.rotationSpeedY * 0.5;
-      this.rotationZ += this.rotationSpeedZ * 0.5;
+      this.rotationX += this.rotationSpeedX * 0.4;
+      this.rotationY += this.rotationSpeedY * 0.4;
+      this.rotationZ += this.rotationSpeedZ * 0.4;
       
       // Gentle wobble effect
       this.sy = Math.sin(this.swingPhase * 2) * 0.1 + 0.9;
