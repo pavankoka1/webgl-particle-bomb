@@ -92,7 +92,7 @@ export const VertexShaderSource = `
     normal = rotationMatrix * normal;
     
     // Convert to 2D screen position with perspective - enhanced for 3D movement
-    float perspective = 1.0 + (pos3D.z / 4000.0); // Much deeper perspective for bomb effect
+    float perspective = 1.0 + (pos3D.z / 10000.0); // Updated for new camera distance
     vec2 screenPos = u_center + pos3D.xy / perspective;
     
     // Pass to fragment shader

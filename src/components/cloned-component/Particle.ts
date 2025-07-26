@@ -1,7 +1,7 @@
 export class Particle {
   centerX: number;
   centerY: number;
-  centerZ: number; // Add Z position for 3D movement
+  centerZ: number;
   radius: number;
   rotationX: number = 0;
   rotationY: number = 0;
@@ -17,28 +17,41 @@ export class Particle {
   depthA: number;
   depthB: number;
   depthScale: number;
-  life: number; // Particle lifetime
-  maxLife: number; // Maximum lifetime
+  life: number;
+  maxLife: number;
+  particleType: 'fall' | 'fade';
 
-  // Bezier curve properties (from reference code)
-  p0: { x: number; y: number; z: number }; // Start point with Z
-  p1: { x: number; y: number; z: number }; // Control point 1 with Z
-  p2: { x: number; y: number; z: number }; // Control point 2 with Z
-  p3: { x: number; y: number; z: number }; // End point with Z
-  time: number = 0; // Current time along curve
-  duration: number; // Total duration of animation
+  // Animation phases
+  phase: 'explosion' | 'settling' = 'explosion';
+  phaseTime: number = 0;
+  
+  // Explosion phase properties
+  explosionDuration: number;
+  explosionVelocityX: number = 0;
+  explosionVelocityY: number = 0;
+  explosionVelocityZ: number = 0;
+  
+  // Settling phase properties
+  settlingDuration: number;
+  settlingTime: number = 0;
+  
+  // Physics properties
+  velocityX: number = 0;
+  velocityY: number = 0;
+  velocityZ: number = 0;
+  gravity: number;
+  airResistance: number;
+  
+  // Swing properties
+  swingAmplitude: number;
+  swingFrequency: number;
+  swingPhase: number = 0;
+  fallSpeed: number;
+  
+  // Animation properties
+  r: number = 0;
+  sy: number = 1;
   complete: boolean = false;
-
-  // Animation properties (from reference code)
-  r: number = 0; // Rotation based on movement direction
-  sy: number = 1; // Scale Y for wobble effect
-
-  // Autumn leaf settling properties
-  settlingPhase: boolean = false; // Whether we're in settling phase
-  settlingTime: number = 0; // Time in settling phase
-  settlingDuration: number = 0; // Duration of settling phase
-  leafWobble: number = 0; // Leaf wobble effect
-  leafWobbleSpeed: number = 0; // Speed of leaf wobble
 
   constructor(
     centerX: number,
@@ -55,7 +68,14 @@ export class Particle {
     depthA: number = 1000,
     depthB: number = 800,
     depthScale: number = 0.5,
-    life: number = 300, // Default lifetime
+    life: number = 300,
+    explosionDuration: number = 0.05, // 50ms explosion
+    settlingDuration: number = 8,
+    swingAmplitude: number = 150,
+    particleType: 'fall' | 'fade' = 'fall',
+    fallSpeed: number = 1.5,
+    gravity: number = 5,
+    airResistance: number = 0.98,
     p0?: { x: number; y: number; z: number },
     p1?: { x: number; y: number; z: number },
     p2?: { x: number; y: number; z: number },
@@ -63,7 +83,7 @@ export class Particle {
   ) {
     this.centerX = centerX;
     this.centerY = centerY;
-    this.centerZ = 0; // Initialize Z position
+    this.centerZ = p0?.z || 0;
     this.radius = radius;
     this.rotationSpeedX = rotationSpeedX;
     this.rotationSpeedY = rotationSpeedY;
@@ -78,155 +98,140 @@ export class Particle {
     this.depthScale = depthScale;
     this.life = life;
     this.maxLife = life;
-
-    // Bezier curve setup (from reference code) - now with Z coordinates
-    this.p0 = p0 || { x: centerX, y: centerY, z: 0 };
-    this.p1 = p1 || { x: centerX, y: centerY, z: 0 };
-    this.p2 = p2 || { x: centerX, y: centerY, z: 0 };
-    this.p3 = p3 || { x: centerX, y: centerY, z: 0 };
-    this.duration = 2 + Math.random() * 1; // 2-3 seconds for explosion phase
+    this.particleType = particleType;
     
-    // Settling phase properties
-    this.settlingDuration = 12 + Math.random() * 8; // 12-20 seconds for settling
-    this.leafWobbleSpeed = 0.3 + Math.random() * 0.7; // Slower wobble speed
-  }
-
-  // Cubic Bezier curve calculation (from reference code) - now with Z coordinates
-  private cubeBezier(
-    p0: { x: number; y: number; z: number },
-    c0: { x: number; y: number; z: number },
-    c1: { x: number; y: number; z: number },
-    p1: { x: number; y: number; z: number },
-    t: number
-  ) {
-    const nt = 1 - t;
-    return {
-      x:
-        nt * nt * nt * p0.x +
-        3 * nt * nt * t * c0.x +
-        3 * nt * t * t * c1.x +
-        t * t * t * p1.x,
-      y:
-        nt * nt * nt * p0.y +
-        3 * nt * nt * t * c0.y +
-        3 * nt * t * t * c1.y +
-        t * t * t * p1.y,
-      z:
-        nt * nt * nt * p0.z +
-        3 * nt * nt * t * c0.z +
-        3 * nt * t * t * c1.z +
-        t * t * t * p1.z,
-    };
-  }
-
-  // Easing function (from reference code)
-  private easeOutCubic(t: number, b: number, c: number, d: number): number {
-    t /= d;
-    t--;
-    return c * (t * t * t + 1) + b;
-  }
-
-  // Ease-in function for explosion
-  private easeInCubic(t: number, b: number, c: number, d: number): number {
-    t /= d;
-    return c * t * t * t + b;
-  }
-
-  // Smooth ease-in-out for explosion
-  private easeInOutCubic(t: number, b: number, c: number, d: number): number {
-    t /= d / 2;
-    if (t < 1) return c / 2 * t * t * t + b;
-    t -= 2;
-    return c / 2 * (t * t * t + 2) + b;
+    // Animation timing
+    this.explosionDuration = explosionDuration;
+    this.settlingDuration = settlingDuration;
+    
+    // Physics properties
+    this.gravity = gravity;
+    this.airResistance = airResistance;
+    this.fallSpeed = fallSpeed;
+    this.swingAmplitude = swingAmplitude;
+    this.swingFrequency = 0.5 + Math.random() * 1.0; // Random swing frequency
+    
+    // Calculate explosion velocities from Bezier points
+    if (p0 && p1 && p2 && p3) {
+      // Calculate initial explosion velocity (from p0 to p2)
+      const explosionDistance = Math.sqrt(
+        Math.pow(p2.x - p0.x, 2) + 
+        Math.pow(p2.y - p0.y, 2) + 
+        Math.pow(p2.z - p0.z, 2)
+      );
+      
+      this.explosionVelocityX = (p2.x - p0.x) / explosionDuration;
+      this.explosionVelocityY = (p2.y - p0.y) / explosionDuration;
+      this.explosionVelocityZ = (p2.z - p0.z) / explosionDuration;
+      
+      // Set initial velocities
+      this.velocityX = this.explosionVelocityX;
+      this.velocityY = this.explosionVelocityY;
+      this.velocityZ = this.explosionVelocityZ;
+    }
   }
 
   update(canvasWidth: number, canvasHeight: number) {
-    // Update time along Bezier curve (from reference code)
-    this.time = Math.min(this.duration, this.time + 1 / 60); // 60fps timeStep
+    const timeStep = 1 / 60; // 60fps timeStep
 
-    if (!this.settlingPhase) {
-      // EXPLOSION PHASE
-      // Calculate position along Bezier curve
-      const f = this.easeInOutCubic(this.time, 0, 1, this.duration);
-      const p = this.cubeBezier(this.p0, this.p1, this.p2, this.p3, f);
-
-      // Calculate movement direction for rotation (from reference code) - now 3D
-      const dx = p.x - this.centerX;
-      const dy = p.y - this.centerY;
-      const dz = p.z - this.centerZ;
-      this.r = Math.atan2(dy, dx) + Math.PI * 0.5; // HALF_PI
-
-      // Wobble effect (from reference code)
-      this.sy = Math.sin(Math.PI * f * 10);
-
-      // Update position - now including Z
-      this.centerX = p.x;
-      this.centerY = p.y;
-      this.centerZ = p.z;
-
-      // Update rotation angles
-      this.rotationX += this.rotationSpeedX;
-      this.rotationY += this.rotationSpeedY;
-      this.rotationZ += this.rotationSpeedZ;
-
+    if (this.phase === 'explosion') {
+      // EXPLOSION PHASE (50ms quick explosion)
+      this.phaseTime += timeStep;
+      
+      // Apply explosion velocities with easing
+      const explosionProgress = this.phaseTime / this.explosionDuration;
+      const easeOut = 1 - Math.pow(1 - explosionProgress, 3); // Ease out cubic
+      
+      // Update position based on explosion velocities
+      this.centerX += this.velocityX * timeStep * easeOut;
+      this.centerY += this.velocityY * timeStep * easeOut;
+      this.centerZ += this.velocityZ * timeStep * easeOut;
+      
+      // Intense rotation during explosion
+      this.rotationX += this.rotationSpeedX * 20;
+      this.rotationY += this.rotationSpeedY * 20;
+      this.rotationZ += this.rotationSpeedZ * 20;
+      
+      // Apply air resistance during explosion
+      this.velocityX *= this.airResistance;
+      this.velocityY *= this.airResistance;
+      this.velocityZ *= this.airResistance;
+      
+      // Wobble effect during explosion
+      this.sy = Math.sin(explosionProgress * Math.PI * 20) * 0.3 + 0.7;
+      
       // Check if explosion phase is complete
-      if (this.time === this.duration) {
-        this.settlingPhase = true;
+      if (this.phaseTime >= this.explosionDuration) {
+        this.phase = 'settling';
         this.settlingTime = 0;
-        console.log('🍂 Particle entered settling phase at:', this.centerX, this.centerY, this.centerZ);
+        console.log('💥 Particle explosion complete, entering settling phase');
       }
+      
     } else {
-      // SETTLING PHASE (Autumn leaf behavior)
-      this.settlingTime += 1 / 60; // 60fps timeStep
+      // SETTLING PHASE (Realistic fall with swing)
+      this.settlingTime += timeStep;
+      this.swingPhase += this.swingFrequency * timeStep;
       
-      // Much slower downward movement with gentle swaying
-      const settlingProgress = this.settlingTime / this.settlingDuration;
-      const fallDistance = 300; // Distance to fall during settling
+      // Apply gravity
+      this.velocityY += this.gravity * this.fallSpeed;
       
-      // Very gentle swaying motion (like autumn leaves)
-      const swayX = Math.sin(this.settlingTime * 0.3) * 80; // Side-to-side sway
-      const swayY = Math.sin(this.settlingTime * 0.2) * 50; // Forward-back sway
-      const swayZ = Math.sin(this.settlingTime * 0.4) * 20; // Z-axis sway
+      // Apply swing motion (realistic leaf-like movement)
+      const swingX = Math.sin(this.swingPhase) * this.swingAmplitude * 0.01;
+      const swingY = Math.cos(this.swingPhase * 0.7) * this.swingAmplitude * 0.005;
+      const swingZ = Math.sin(this.swingPhase * 0.5) * this.swingAmplitude * 0.001; // Reduced Z swing
       
-      // Update position with very slow falling and swaying
-      this.centerX += swayX * 0.005; // Very slow sway
-      this.centerY += Math.max(fallDistance * 0.0005 + swayY * 0.005, 0.1); // Ensure minimum fall speed
-      this.centerZ += swayZ * 0.002 + (Math.random() - 0.5) * 0.2; // Slight Z drift
+      // Apply swing forces
+      this.velocityX += swingX;
+      this.velocityY += swingY;
+      this.velocityZ += swingZ;
       
-      // Autumn leaf rotation (very slow, natural)
-      this.rotationX += this.rotationSpeedX * 0.05; // Much slower rotation
-      this.rotationY += this.rotationSpeedY * 0.05;
-      this.rotationZ += this.rotationSpeedZ * 0.05;
+      // Apply air resistance
+      this.velocityX *= this.airResistance;
+      this.velocityY *= this.airResistance;
+      this.velocityZ *= this.airResistance;
       
-      // Leaf wobble effect (gentler)
-      this.leafWobble += this.leafWobbleSpeed * 0.005;
-      this.sy = Math.sin(this.leafWobble) * 0.2 + 0.8; // Very gentle wobble
+      // Update position
+      this.centerX += this.velocityX * timeStep;
+      this.centerY += this.velocityY * timeStep;
+      this.centerZ += this.velocityZ * timeStep;
+      
+      // Clamp Z position to keep particles visible
+      this.centerZ = Math.max(-2000, Math.min(500, this.centerZ));
+      
+      // Realistic rotation during fall
+      this.rotationX += this.rotationSpeedX * 0.5;
+      this.rotationY += this.rotationSpeedY * 0.5;
+      this.rotationZ += this.rotationSpeedZ * 0.5;
+      
+      // Gentle wobble effect
+      this.sy = Math.sin(this.swingPhase * 2) * 0.1 + 0.9;
       
       // Update rotation based on movement direction
-      this.r = Math.atan2(swayY, swayX) + Math.PI * 0.5;
+      this.r = Math.atan2(this.velocityY, this.velocityX) + Math.PI * 0.5;
       
       // Check if settling is complete
-      if (this.settlingTime >= this.settlingDuration) {
+      if (this.centerY > canvasHeight + 100 || 
+          this.centerX < -100 || 
+          this.centerX > canvasWidth + 100 ||
+          this.centerZ > 1000 || // More reasonable Z limit
+          this.settlingTime >= this.settlingDuration) {
         this.complete = true;
-        console.log('✅ Particle settled at:', this.centerX, this.centerY, this.centerZ);
+        console.log('✅ Particle settled/left screen:', this.centerX, this.centerY, this.centerZ, 'Type:', this.particleType);
       }
     }
 
     // Decrease life
     this.life--;
     
-    // Force completion if life runs out
-    if (this.life <= 0) {
+    // Force completion if life runs out or stuck too long
+    if (this.life <= 0 || (this.phase === 'settling' && this.settlingTime > this.settlingDuration + 5)) {
       this.complete = true;
-      console.log('⏰ Particle expired due to life:', this.centerX, this.centerY, this.centerZ);
+      console.log('⏰ Particle expired:', this.centerX, this.centerY, this.centerZ);
     }
   }
 
   isAlive(): boolean {
     // Particle is alive if it has life left and is not complete
-    // Also ensure it's not stuck in settling phase for too long
-    const maxSettlingTime = this.settlingDuration + 2; // Allow 2 seconds extra
-    
     if (this.life <= 0) {
       return false; // No life left
     }
@@ -235,17 +240,17 @@ export class Particle {
       return false; // Animation complete
     }
     
-    if (this.settlingPhase && this.settlingTime > maxSettlingTime) {
-      this.complete = true; // Force completion if stuck too long
-      console.log('⏰ Particle forced to complete (stuck too long):', this.centerX, this.centerY, this.centerZ);
-      return false;
-    }
-    
     return true;
   }
 
   getAlpha(): number {
-    // Fade out as particle ages
-    return this.life / this.maxLife;
+    // For fade particles, fade out during settling phase
+    if (this.particleType === 'fade' && this.phase === 'settling') {
+      const fadeProgress = this.settlingTime / this.settlingDuration;
+      return Math.max(0, 1 - fadeProgress * 0.8);
+    }
+    
+    // For fall particles, maintain full opacity
+    return 1.0;
   }
 }

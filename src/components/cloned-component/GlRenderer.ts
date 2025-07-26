@@ -1,6 +1,21 @@
 import { Particle } from "./Particle";
 import { FragmentShaderSource, VertexShaderSource } from "./shaders";
 
+// Animation configuration interface
+export interface ExplosionConfig {
+  particleCount: number;
+  explosionDuration: number; // 50ms for quick explosion
+  explosionForce: number;
+  particleRadius: number;
+  settlingDuration: number;
+  swingAmplitude: number;
+  fallSpeed: number;
+  gravity: number;
+  airResistance: number;
+  zScatter: number; // How much particles scatter on Z-axis
+  cameraDistance: number; // How far the camera is
+}
+
 export class GlRenderer {
   private gl: WebGLRenderingContext;
   private program: WebGLProgram;
@@ -26,9 +41,24 @@ export class GlRenderer {
   // Particles
   private particles: Particle[] = [];
 
-  // Lighting properties
-  private lightPosition: [number, number, number] = [0, 0, 3000]; // Light much further away
-  private viewPosition: [number, number, number] = [0, 0, 4000]; // View position much further away
+  // Lighting properties - much further away for better depth perception
+  private lightPosition: [number, number, number] = [0, 0, 8000]; // Light much further away
+  private viewPosition: [number, number, number] = [0, 0, 10000]; // View position much further away
+
+  // Default configuration
+  private defaultConfig: ExplosionConfig = {
+    particleCount: 300,
+    explosionDuration: 0.05, // 50ms explosion
+    explosionForce: 800, // Reduced for better visibility
+    particleRadius: 0.3,
+    settlingDuration: 8,
+    swingAmplitude: 150,
+    fallSpeed: 1.5,
+    gravity: 5,
+    airResistance: 0.98,
+    zScatter: 1000, // Reduced Z scatter
+    cameraDistance: 10000
+  };
 
   constructor(gl: WebGLRenderingContext) {
     this.gl = gl;
@@ -88,13 +118,17 @@ export class GlRenderer {
   createBombExplosion(
     burstX: number = this.gl.canvas.width / 2,
     burstY: number = this.gl.canvas.height / 2,
-    particleCount: number = 250
+    config: ExplosionConfig = this.defaultConfig
   ) {
-    console.log('🎯 Creating bomb explosion at:', burstX, burstY, 'with', particleCount, 'particles');
+    console.log('🎯 Creating bomb explosion at:', burstX, burstY, 'with config:', config);
     
     // Clear existing particles
     this.particles = [];
     console.log('🧹 Cleared existing particles');
+
+    // Update camera and lighting positions based on config
+    this.viewPosition = [0, 0, config.cameraDistance];
+    this.lightPosition = [0, 0, config.cameraDistance * 0.8];
 
     // Define golden color palette
     const goldenColors = [
@@ -105,39 +139,44 @@ export class GlRenderer {
       [0.9, 0.6, 0.2, 1.0],       // Light Gold
     ];
 
-    for (let i = 0; i < particleCount; i++) {
-      // Start from deep Z-axis (bomb explosion point)
-      const startZ = -1200 + Math.random() * 300; // Even deeper Z position
+    for (let i = 0; i < config.particleCount; i++) {
+      // Start from Z=-1000 (in front of camera)
+      const startZ = -1000;
       
-      // More even spherical distribution for better scattering
+      // Spherical distribution for explosion in all directions
       const theta = Math.random() * 2 * Math.PI; // Horizontal angle
-      const phi = Math.acos(2 * Math.random() - 1); // Better spherical distribution
-      const explosionRadius = 400 + Math.random() * 600; // Larger explosion radius
+      const phi = Math.acos(2 * Math.random() - 1); // Vertical angle for full sphere
+      const explosionRadius = config.explosionForce + Math.random() * config.explosionForce * 0.3;
       
-      // Calculate explosion end point in 3D space
-      const endX = burstX + Math.sin(phi) * Math.cos(theta) * explosionRadius;
-      const endY = burstY + Math.sin(phi) * Math.sin(theta) * explosionRadius;
-      const endZ = startZ + Math.cos(phi) * explosionRadius;
+      // Calculate explosion velocity in all directions
+      const velocityX = Math.sin(phi) * Math.cos(theta) * explosionRadius;
+      const velocityY = Math.sin(phi) * Math.sin(theta) * explosionRadius;
+      const velocityZ = Math.cos(phi) * explosionRadius;
       
-      // Control points for smooth explosion curve with ease-in
-      const midX = burstX + Math.sin(phi) * Math.cos(theta) * (explosionRadius * 0.4);
-      const midY = burstY + Math.sin(phi) * Math.sin(theta) * (explosionRadius * 0.4);
-      const midZ = startZ + Math.cos(phi) * (explosionRadius * 0.4);
+      // Calculate explosion end point in 3D space (ensure it's in front of camera)
+      const endX = burstX + velocityX;
+      const endY = burstY + velocityY;
+      const endZ = startZ + velocityZ;
       
-      // Final settling position (like autumn leaves falling)
-      const settleX = endX + (Math.random() - 0.5) * 600; // More spread
-      const settleY = this.gl.canvas.height + 150; // Below screen
-      const settleZ = endZ + (Math.random() - 0.5) * 300; // More Z variation
+      // Control points for smooth explosion curve
+      const midX = burstX + velocityX * 0.3;
+      const midY = burstY + velocityY * 0.3;
+      const midZ = startZ + velocityZ * 0.3;
+      
+      // Final settling position with swing (ensure it's below screen)
+      const settleX = endX + (Math.random() - 0.5) * config.swingAmplitude;
+      const settleY = this.gl.canvas.height + 100; // Below screen
+      const settleZ = endZ + (Math.random() - 0.5) * config.zScatter * 0.1; // Minimal Z variation for settling
 
       // Particle properties
-      const radius = 0.15 + Math.random() * 0.25; // Slightly larger for visibility
-      const scaleX = 0.03 + Math.random() * 0.1;
-      const scaleY = 0.04 + Math.random() * 0.12;
+      const radius = config.particleRadius + Math.random() * 0.2;
+      const scaleX = 0.04 + Math.random() * 0.12;
+      const scaleY = 0.05 + Math.random() * 0.15;
 
-      // Autumn leaf rotation speeds (even slower, more natural)
-      const rotationSpeedX = (Math.random() - 0.5) * 0.01; // Very slow rotation
-      const rotationSpeedY = (Math.random() - 0.5) * 0.01;
-      const rotationSpeedZ = (Math.random() - 0.5) * 0.01;
+      // Rotation speeds for realistic swing
+      const rotationSpeedX = (Math.random() - 0.5) * 0.08;
+      const rotationSpeedY = (Math.random() - 0.5) * 0.08;
+      const rotationSpeedZ = (Math.random() - 0.5) * 0.08;
 
       // Select golden color
       const colorIndex = Math.floor(Math.random() * goldenColors.length);
@@ -149,16 +188,21 @@ export class GlRenderer {
       ];
 
       // Metallic properties for golden particles
-      const metallic = 0.7 + Math.random() * 0.3; // More metallic for golden effect
-      const roughness = 0.1 + Math.random() * 0.2; // Less rough for golden shine
+      const metallic = 0.95 + Math.random() * 0.05;
+      const roughness = 0.02 + Math.random() * 0.08;
 
       // Depth parameters for golden particle shape
-      const depthA = 60.0 + Math.random() * 120.0;
-      const depthB = 50.0 + Math.random() * 100.0;
-      const depthScale = 0.03 + Math.random() * 0.08;
+      const depthA = 80.0 + Math.random() * 160.0;
+      const depthB = 70.0 + Math.random() * 140.0;
+      const depthScale = 0.04 + Math.random() * 0.12;
 
-      // Much longer lifetime for very slow settling
-      const life = 900 + Math.random() * 600; // 15-25 seconds
+      // Particle type: 90% fall, 10% fade
+      const particleType = Math.random() < 0.1 ? 'fade' : 'fall';
+      
+      // Lifetime based on particle type
+      const life = particleType === 'fade' 
+        ? 600 + Math.random() * 400  // Shorter for fade particles
+        : 1200 + Math.random() * 600; // Longer for fall particles
 
       // Bezier control points for explosion + settling animation
       const p0 = { x: burstX, y: burstY, z: startZ }; // Start at explosion center
@@ -183,6 +227,13 @@ export class GlRenderer {
           depthB,
           depthScale,
           life,
+          config.explosionDuration,
+          config.settlingDuration,
+          config.swingAmplitude,
+          particleType,
+          config.fallSpeed,
+          config.gravity,
+          config.airResistance,
           p0,
           p1,
           p2,
@@ -196,19 +247,34 @@ export class GlRenderer {
 
   private generateRandomParticles(count: number) {
     console.log('🎲 generateRandomParticles called with count:', count);
-    // Create bomb explosion from center
+    // Create bomb explosion from center with default config
     this.createBombExplosion(
       this.gl.canvas.width / 2,
       this.gl.canvas.height / 2,
-      200
+      this.defaultConfig
     );
   }
 
   // Public method to trigger bomb explosion
-  public triggerBombExplosion(burstX?: number, burstY?: number) {
+  public triggerBombExplosion(
+    burstX?: number, 
+    burstY?: number,
+    config?: ExplosionConfig
+  ) {
     const x = burstX ?? this.gl.canvas.width / 2;
     const y = burstY ?? this.gl.canvas.height / 2;
-    this.createBombExplosion(x, y, 200);
+    const explosionConfig = config ?? this.defaultConfig;
+    this.createBombExplosion(x, y, explosionConfig);
+  }
+
+  // Get current default config
+  public getDefaultConfig(): ExplosionConfig {
+    return { ...this.defaultConfig };
+  }
+
+  // Update default config
+  public updateConfig(newConfig: Partial<ExplosionConfig>) {
+    this.defaultConfig = { ...this.defaultConfig, ...newConfig };
   }
 
   private init() {
@@ -371,8 +437,8 @@ export class GlRenderer {
     // Set lighting uniforms - much further away for better depth perception
     const canvasCenterX = this.gl.canvas.width / 2;
     const canvasCenterY = this.gl.canvas.height / 2;
-    this.lightPosition = [canvasCenterX + 800, canvasCenterY - 400, 3000]; // Much further light
-    this.viewPosition = [canvasCenterX, canvasCenterY, 4000]; // Much further view
+    this.lightPosition = [canvasCenterX + 800, canvasCenterY - 400, this.defaultConfig.cameraDistance * 0.8];
+    this.viewPosition = [canvasCenterX, canvasCenterY, this.defaultConfig.cameraDistance];
 
     if (this.lightPositionUniformLocation) {
       this.gl.uniform3f(this.lightPositionUniformLocation, ...this.lightPosition);
