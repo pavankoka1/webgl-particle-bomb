@@ -37,7 +37,9 @@ export const GlWorkshop: FC = () => {
     
     // Trigger bomb explosion after a short delay (only once)
     if (!explosionTriggered.current) {
+      console.log('🔄 Setting up initial explosion...');
       setTimeout(() => {
+        console.log('💥 Triggering initial explosion at:', new Date().toISOString());
         glRenderer.triggerBombExplosion();
         explosionTriggered.current = true;
       }, 500);
@@ -55,6 +57,7 @@ export const GlWorkshop: FC = () => {
       const rect = event.currentTarget.getBoundingClientRect();
       const x = event.clientX - rect.left;
       const y = event.clientY - rect.top;
+      console.log('💥 Manual explosion triggered at:', x, y, 'Time:', new Date().toISOString());
       renderer.triggerBombExplosion(x, y);
     }
   };

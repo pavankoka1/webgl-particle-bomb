@@ -173,6 +173,7 @@ export class Particle {
       if (this.time === this.duration) {
         this.settlingPhase = true;
         this.settlingTime = 0;
+        console.log('🍂 Particle entered settling phase at:', this.centerX, this.centerY, this.centerZ);
       }
     } else {
       // SETTLING PHASE (Autumn leaf behavior)
@@ -189,7 +190,7 @@ export class Particle {
       
       // Update position with very slow falling and swaying
       this.centerX += swayX * 0.005; // Very slow sway
-      this.centerY += fallDistance * 0.0005 + swayY * 0.005; // Very slow fall with sway
+      this.centerY += Math.max(fallDistance * 0.0005 + swayY * 0.005, 0.1); // Ensure minimum fall speed
       this.centerZ += swayZ * 0.002 + (Math.random() - 0.5) * 0.2; // Slight Z drift
       
       // Autumn leaf rotation (very slow, natural)
@@ -207,15 +208,40 @@ export class Particle {
       // Check if settling is complete
       if (this.settlingTime >= this.settlingDuration) {
         this.complete = true;
+        console.log('✅ Particle settled at:', this.centerX, this.centerY, this.centerZ);
       }
     }
 
     // Decrease life
     this.life--;
+    
+    // Force completion if life runs out
+    if (this.life <= 0) {
+      this.complete = true;
+      console.log('⏰ Particle expired due to life:', this.centerX, this.centerY, this.centerZ);
+    }
   }
 
   isAlive(): boolean {
-    return this.life > 0 && !this.complete;
+    // Particle is alive if it has life left and is not complete
+    // Also ensure it's not stuck in settling phase for too long
+    const maxSettlingTime = this.settlingDuration + 2; // Allow 2 seconds extra
+    
+    if (this.life <= 0) {
+      return false; // No life left
+    }
+    
+    if (this.complete) {
+      return false; // Animation complete
+    }
+    
+    if (this.settlingPhase && this.settlingTime > maxSettlingTime) {
+      this.complete = true; // Force completion if stuck too long
+      console.log('⏰ Particle forced to complete (stuck too long):', this.centerX, this.centerY, this.centerZ);
+      return false;
+    }
+    
+    return true;
   }
 
   getAlpha(): number {

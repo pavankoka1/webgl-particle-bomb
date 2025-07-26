@@ -27,8 +27,8 @@ export class GlRenderer {
   private particles: Particle[] = [];
 
   // Lighting properties
-  private lightPosition: [number, number, number] = [0, 0, 1500]; // Light much further away
-  private viewPosition: [number, number, number] = [0, 0, 2000]; // View position much further away
+  private lightPosition: [number, number, number] = [0, 0, 3000]; // Light much further away
+  private viewPosition: [number, number, number] = [0, 0, 4000]; // View position much further away
 
   constructor(gl: WebGLRenderingContext) {
     this.gl = gl;
@@ -90,8 +90,11 @@ export class GlRenderer {
     burstY: number = this.gl.canvas.height / 2,
     particleCount: number = 250
   ) {
+    console.log('🎯 Creating bomb explosion at:', burstX, burstY, 'with', particleCount, 'particles');
+    
     // Clear existing particles
     this.particles = [];
+    console.log('🧹 Cleared existing particles');
 
     // Define golden color palette
     const goldenColors = [
@@ -187,9 +190,12 @@ export class GlRenderer {
         )
       );
     }
+    
+    console.log(`✨ Created ${this.particles.length} particles for explosion`);
   }
 
   private generateRandomParticles(count: number) {
+    console.log('🎲 generateRandomParticles called with count:', count);
     // Create bomb explosion from center
     this.createBombExplosion(
       this.gl.canvas.width / 2,
@@ -285,8 +291,7 @@ export class GlRenderer {
     const segments = 64; // Number of segments to approximate the circle
     const radius = 100; // Circle radius in pixels
 
-    // Generate random particles
-    this.generateRandomParticles(1); // Create 1 particle in center
+    // Don't generate particles here - they will be created by triggerBombExplosion
 
     var positions: number[] = [];
 
@@ -366,8 +371,8 @@ export class GlRenderer {
     // Set lighting uniforms - much further away for better depth perception
     const canvasCenterX = this.gl.canvas.width / 2;
     const canvasCenterY = this.gl.canvas.height / 2;
-    this.lightPosition = [canvasCenterX + 400, canvasCenterY - 200, 1500]; // Much further light
-    this.viewPosition = [canvasCenterX, canvasCenterY, 2000]; // Much further view
+    this.lightPosition = [canvasCenterX + 800, canvasCenterY - 400, 3000]; // Much further light
+    this.viewPosition = [canvasCenterX, canvasCenterY, 4000]; // Much further view
 
     if (this.lightPositionUniformLocation) {
       this.gl.uniform3f(this.lightPositionUniformLocation, ...this.lightPosition);
@@ -400,10 +405,21 @@ export class GlRenderer {
     const canvasHeight = this.gl.canvas.height;
 
     // Update particles and remove dead ones
+    const initialCount = this.particles.length;
     this.particles = this.particles.filter((particle) => {
       particle.update(canvasWidth, canvasHeight);
       return particle.isAlive();
     });
+    
+    const finalCount = this.particles.length;
+    if (initialCount !== finalCount) {
+      console.log(`📊 Particles: ${initialCount} -> ${finalCount} (removed ${initialCount - finalCount})`);
+    }
+    
+    // Log if all particles are gone
+    if (finalCount === 0 && initialCount > 0) {
+      console.log('🎬 All particles have settled or expired');
+    }
   }
 
   private animate = () => {
