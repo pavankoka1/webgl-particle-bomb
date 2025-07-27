@@ -8,27 +8,27 @@ export const GlWorkshop: FC = () => {
   const explosionTriggered = useRef(false);
   const [showConfig, setShowConfig] = useState(false);
   const [config, setConfig] = useState<ExplosionConfig>({
-    particleCount: 300,
-    explosionDuration: 0.05,
-    explosionForce: 75,
-    particleRadiusMin: 0.2,
-    particleRadiusMax: 0.75,
-    settlingDuration: 5,
-    swingAmplitude: 150,
-    fallSpeed: 1.5,
-    gravity: 5,
-    airResistance: 0.98,
-    zScatter: 1000,
+    particleCount: 400, // More particles for better bomb effect
+    explosionDuration: 0.08, // Much faster explosion (80ms)
+    explosionForce: 800, // Much stronger force for dramatic bomb effect
+    particleRadiusMin: 0.15,
+    particleRadiusMax: 0.6,
+    settlingDuration: 6, // Longer settling for more dramatic effect
+    swingAmplitude: 200, // More swing for realistic movement
+    fallSpeed: 1.8, // Slightly faster fall
+    gravity: 6, // Stronger gravity
+    airResistance: 0.985, // Slightly more air resistance
+    zScatter: 1200, // More Z scatter for depth
     cameraDistance: 10000,
-    centerX: 0.5,
-    centerY: 0.8,
-    minX: 0.1,
-    maxX: 0.9,
-    minY: 0.1,
-    maxY: 0.95,
+    centerX: 0.5, // 0=left, 1=right
+    centerY: 0.8, // 0=bottom, 1=top
+    minX: 0.1, // 0=left edge, 1=right edge
+    maxX: 0.9, // 0=left edge, 1=right edge
+    minY: 0.1, // 0=bottom edge, 1=top edge
+    maxY: 0.95, // 0=bottom edge, 1=top edge
     metallic: 0.98,
     roughness: 0.08,
-    goldColor: [1.0, 0.866, 0.262, 1.0], // #FFDD43
+    goldColor: [1.0, 0.8, 0.2, 1.0], // #FFCC33
   });
 
   useEffect(() => {

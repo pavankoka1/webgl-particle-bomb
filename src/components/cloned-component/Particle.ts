@@ -19,10 +19,10 @@ export class Particle {
   depthScale: number;
   life: number;
   maxLife: number;
-  particleType: 'fall' | 'fade';
+  particleType: 'fall' | 'fade' | 'leaf';
 
   // Animation phases
-  phase: 'explosion' | 'settling' = 'explosion';
+  phase: 'approach' | 'explosion' | 'settling' = 'approach';
   phaseTime: number = 0;
   
   // Explosion phase properties
@@ -30,6 +30,10 @@ export class Particle {
   explosionVelocityX: number = 0;
   explosionVelocityY: number = 0;
   explosionVelocityZ: number = 0;
+  // Approach phase properties
+  approachTargetZ: number = 0;
+  approachSpeed: number = 0;
+  explosionScatter: { x: number; y: number; z: number } | null = null;
   
   // Settling phase properties
   settlingDuration: number;
@@ -53,6 +57,10 @@ export class Particle {
   sy: number = 1;
   complete: boolean = false;
 
+  p0?: { x: number; y: number; z: number };
+  p1?: { x: number; y: number; z: number };
+  p2?: { x: number; y: number; z: number };
+
   constructor(
     centerX: number,
     centerY: number,
@@ -69,10 +77,10 @@ export class Particle {
     depthB: number = 800,
     depthScale: number = 0.5,
     life: number = 300,
-    explosionDuration: number = 0.05, // 50ms explosion
+    explosionDuration: number = 0.0005, // Fast explosion (0.5ms)
     settlingDuration: number = 8,
     swingAmplitude: number = 150,
-    particleType: 'fall' | 'fade' = 'fall',
+    particleType: 'fall' | 'fade' | 'leaf' = 'fall',
     fallSpeed: number = 1.5,
     gravity: number = 5,
     airResistance: number = 0.98,
@@ -81,7 +89,13 @@ export class Particle {
     p2?: { x: number; y: number; z: number },
     p3?: { x: number; y: number; z: number },
     swingFrequency: number = 1.0,
-    swingPhase: number = 0.0
+    swingPhase: number = 0.0,
+    velocityX: number = 0,
+    velocityY: number = 0,
+    velocityZ: number = 0,
+    approachTargetZ: number = 0,
+    approachSpeed: number = 0,
+    explosionScatter: { x: number; y: number; z: number } | null = null
   ) {
     this.centerX = centerX;
     this.centerY = centerY;
@@ -132,56 +146,89 @@ export class Particle {
       this.velocityY = this.explosionVelocityY;
       this.velocityZ = this.explosionVelocityZ;
     }
+    this.velocityX = velocityX;
+    this.velocityY = velocityY;
+    this.velocityZ = velocityZ;
+    this.p0 = p0;
+    this.p1 = p1;
+    this.p2 = p2;
+    this.approachTargetZ = approachTargetZ;
+    this.approachSpeed = approachSpeed;
+    this.explosionScatter = explosionScatter;
   }
 
   update(canvasWidth: number, canvasHeight: number) {
     const timeStep = 1 / 60; // 60fps timeStep
 
-    if (this.phase === 'explosion') {
-      // EXPLOSION PHASE (50ms quick explosion)
+    if (this.phase === 'approach') {
+      // APPROACH PHASE: Particles accelerate towards explosion center from deep Z
       this.phaseTime += timeStep;
       
-      // Apply explosion velocities with easing
+      // Update position using approach velocity
+      this.centerX += this.velocityX * timeStep;
+      this.centerY += this.velocityY * timeStep;
+      this.centerZ += this.velocityZ * timeStep;
+      
+      // Add slight rotation during approach
+      this.rotationX += this.rotationSpeedX * 2;
+      this.rotationY += this.rotationSpeedY * 2;
+      this.rotationZ += this.rotationSpeedZ * 2;
+      
+      // Check if we've reached the explosion center (Z=0)
+      if (this.centerZ >= -200) { // Within 200px of explosion center
+        // Arrived at explosion center, switch to explosion phase
+        this.phase = 'explosion';
+        this.phaseTime = 0;
+        // Assign outward velocity (explosionScatter)
+        if (this.explosionScatter) {
+          this.velocityX = this.explosionScatter.x;
+          this.velocityY = this.explosionScatter.y;
+          this.velocityZ = this.explosionScatter.z;
+        }
+        console.log('💥 Particle reached explosion center, starting explosion');
+      }
+      return;
+    }
+
+    if (this.phase === 'explosion') {
+      // EXPLOSION PHASE: Particles burst outward from center
+      this.phaseTime += timeStep;
+      this.centerX += this.velocityX * timeStep;
+      this.centerY += this.velocityY * timeStep;
+      this.centerZ += this.velocityZ * timeStep;
+      
+      // Moderate rotation during explosion (reduced to prevent glitchy appearance)
+      this.rotationX += this.rotationSpeedX * 80;
+      this.rotationY += this.rotationSpeedY * 80;
+      this.rotationZ += this.rotationSpeedZ * 80;
+      
+      // Subtle wobble effect during explosion
       const explosionProgress = this.phaseTime / this.explosionDuration;
-      const easeOut = 1 - Math.pow(1 - explosionProgress, 3); // Ease out cubic
-      
-      // Update position based on explosion velocities
-      this.centerX += this.velocityX * timeStep * easeOut;
-      this.centerY += this.velocityY * timeStep * easeOut;
-      this.centerZ += this.velocityZ * timeStep * easeOut;
-      
-      // Intense rotation during explosion
-      this.rotationX += this.rotationSpeedX * 20;
-      this.rotationY += this.rotationSpeedY * 20;
-      this.rotationZ += this.rotationSpeedZ * 20;
-      
-      // Apply air resistance during explosion
-      this.velocityX *= this.airResistance;
-      this.velocityY *= this.airResistance;
-      this.velocityZ *= this.airResistance;
-      
-      // Wobble effect during explosion
-      this.sy = Math.sin(explosionProgress * Math.PI * 20) * 0.3 + 0.7;
+      this.sy = Math.sin(explosionProgress * Math.PI * 20) * 0.2 + 0.8;
       
       // Check if explosion phase is complete
       if (this.phaseTime >= this.explosionDuration) {
         this.phase = 'settling';
         this.settlingTime = 0;
+        // Dampen velocity so debris stays on-screen (extra for "leaf")
+        const damp = this.particleType === 'leaf' ? 0.3 : 0.5;
+        this.velocityX *= damp;
+        this.velocityY *= damp;
+        this.velocityZ *= damp;
         console.log('💥 Particle explosion complete, entering settling phase');
       }
-      
     } else {
-      // SETTLING PHASE (Realistic fall with swing)
+      // SETTLING PHASE: Particles fall due to gravity with swing motion
       this.settlingTime += timeStep;
       this.swingPhase += this.swingFrequency * timeStep;
       
-      // Apply gravity
+      // Apply gravity (stronger gravity for faster fall)
       this.velocityY += this.gravity * this.fallSpeed;
       
-      // Apply swing motion (realistic leaf-like movement)
-      const swingX = Math.sin(this.swingPhase) * this.swingAmplitude * 0.01;
-      const swingY = Math.cos(this.swingPhase * 0.7 + this.swingPhase) * this.swingAmplitude * 0.005;
-      const swingZ = Math.sin(this.swingPhase * 0.5 + this.swingPhase) * this.swingAmplitude * 0.001; // Reduced Z swing
+      // Swing motion for realistic debris movement
+      const swingX = Math.sin(this.swingPhase) * this.swingAmplitude * 0.015;
+      const swingY = Math.cos(this.swingPhase * 0.7) * this.swingAmplitude * 0.008;
+      const swingZ = Math.sin(this.swingPhase * 0.5) * this.swingAmplitude * 0.002;
       
       // Apply swing forces
       this.velocityX += swingX;
@@ -201,22 +248,22 @@ export class Particle {
       // Clamp Z position to keep particles visible
       this.centerZ = Math.max(-2000, Math.min(500, this.centerZ));
       
-      // Realistic rotation during fall
+      // Rotation during fall
       this.rotationX += this.rotationSpeedX * 0.4;
       this.rotationY += this.rotationSpeedY * 0.4;
       this.rotationZ += this.rotationSpeedZ * 0.4;
       
-      // Gentle wobble effect
-      this.sy = Math.sin(this.swingPhase * 2) * 0.1 + 0.9;
+      // Wobble effect during settling
+      this.sy = Math.sin(this.swingPhase * 2) * 0.15 + 0.85;
       
       // Update rotation based on movement direction
       this.r = Math.atan2(this.velocityY, this.velocityX) + Math.PI * 0.5;
       
-      // Check if settling is complete
+      // Check if settling is complete (particles fall off screen)
       if (this.centerY > canvasHeight + 100 || 
           this.centerX < -100 || 
           this.centerX > canvasWidth + 100 ||
-          this.centerZ > 1000 || // More reasonable Z limit
+          this.centerZ > 1000 ||
           this.settlingTime >= this.settlingDuration) {
         this.complete = true;
         console.log('✅ Particle settled/left screen:', this.centerX, this.centerY, this.centerZ, 'Type:', this.particleType);
@@ -226,7 +273,7 @@ export class Particle {
     // Decrease life
     this.life--;
     
-    // Force completion if life runs out or stuck too long
+    // Force completion if life runs out
     if (this.life <= 0 || (this.phase === 'settling' && this.settlingTime > this.settlingDuration + 5)) {
       this.complete = true;
       console.log('⏰ Particle expired:', this.centerX, this.centerY, this.centerZ);
