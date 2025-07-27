@@ -174,8 +174,13 @@ export class Particle {
       this.rotationY += this.rotationSpeedY * 2;
       this.rotationZ += this.rotationSpeedZ * 2;
       
+      // Scale particles based on Z position for depth effect
+      const depthProgress = (this.centerZ + 2000) / 2000; // Normalize Z progress
+      this.scaleX = 0.1 + depthProgress * 0.9; // Start small, grow as approaching
+      this.scaleY = 0.1 + depthProgress * 0.9;
+      
       // Check if we've reached the explosion center (Z=0)
-      if (this.centerZ >= -200) { // Within 200px of explosion center
+      if (this.centerZ >= -100) { // Within 100px of explosion center
         // Arrived at explosion center, switch to explosion phase
         this.phase = 'explosion';
         this.phaseTime = 0;
@@ -210,32 +215,36 @@ export class Particle {
       if (this.phaseTime >= this.explosionDuration) {
         this.phase = 'settling';
         this.settlingTime = 0;
-        // Dampen velocity so debris stays on-screen (extra for "leaf")
-        const damp = this.particleType === 'leaf' ? 0.3 : 0.5;
+        // Dampen velocity for more realistic settling
+        const damp = this.particleType === 'leaf' ? 0.4 : 0.6;
         this.velocityX *= damp;
         this.velocityY *= damp;
         this.velocityZ *= damp;
         console.log('💥 Particle explosion complete, entering settling phase');
       }
     } else {
-      // SETTLING PHASE: Particles fall due to gravity with swing motion
+      // SETTLING PHASE: Particles fall due to gravity with enhanced swing motion
       this.settlingTime += timeStep;
       this.swingPhase += this.swingFrequency * timeStep;
       
-      // Apply gravity (stronger gravity for faster fall)
+      // Apply gravity (reduced for slower fall)
       this.velocityY += this.gravity * this.fallSpeed;
       
-      // Swing motion for realistic debris movement
-      const swingX = Math.sin(this.swingPhase) * this.swingAmplitude * 0.015;
-      const swingY = Math.cos(this.swingPhase * 0.7) * this.swingAmplitude * 0.008;
-      const swingZ = Math.sin(this.swingPhase * 0.5) * this.swingAmplitude * 0.002;
+      // Enhanced swing motion for realistic leaf-like debris movement
+      const swingX = Math.sin(this.swingPhase) * this.swingAmplitude * 0.02;
+      const swingY = Math.cos(this.swingPhase * 0.7) * this.swingAmplitude * 0.01;
+      const swingZ = Math.sin(this.swingPhase * 0.5) * this.swingAmplitude * 0.003;
+      
+      // Additional cross-axis swing for more realistic motion
+      const crossSwingX = Math.sin(this.swingPhase * 1.3) * this.swingAmplitude * 0.015;
+      const crossSwingY = Math.cos(this.swingPhase * 0.9) * this.swingAmplitude * 0.008;
       
       // Apply swing forces
-      this.velocityX += swingX;
-      this.velocityY += swingY;
+      this.velocityX += swingX + crossSwingX;
+      this.velocityY += swingY + crossSwingY;
       this.velocityZ += swingZ;
       
-      // Apply air resistance
+      // Apply air resistance (more realistic for thin particles)
       this.velocityX *= this.airResistance;
       this.velocityY *= this.airResistance;
       this.velocityZ *= this.airResistance;
@@ -245,25 +254,30 @@ export class Particle {
       this.centerY += this.velocityY * timeStep;
       this.centerZ += this.velocityZ * timeStep;
       
-      // Clamp Z position to keep particles visible
-      this.centerZ = Math.max(-2000, Math.min(500, this.centerZ));
+      // Clamp Z position to keep particles visible (but allow some depth)
+      this.centerZ = Math.max(-3000, Math.min(1000, this.centerZ));
       
-      // Rotation during fall
-      this.rotationX += this.rotationSpeedX * 0.4;
-      this.rotationY += this.rotationSpeedY * 0.4;
-      this.rotationZ += this.rotationSpeedZ * 0.4;
+      // NO CANVAS BOUNDARY CONSTRAINTS - particles can freely move outside
+      // This allows particles to naturally fall off screen or fly away
       
-      // Wobble effect during settling
-      this.sy = Math.sin(this.swingPhase * 2) * 0.15 + 0.85;
+      // Rotation during fall (more varied for leaf particles)
+      const rotationMultiplier = this.particleType === 'leaf' ? 0.8 : 0.4;
+      this.rotationX += this.rotationSpeedX * rotationMultiplier;
+      this.rotationY += this.rotationSpeedY * rotationMultiplier;
+      this.rotationZ += this.rotationSpeedZ * rotationMultiplier;
       
-      // Update rotation based on movement direction
+      // Enhanced wobble effect during settling
+      this.sy = Math.sin(this.swingPhase * 2) * 0.2 + 0.8;
+      
+      // Update rotation based on movement direction for realistic orientation
       this.r = Math.atan2(this.velocityY, this.velocityX) + Math.PI * 0.5;
       
-      // Check if settling is complete (particles fall off screen)
-      if (this.centerY > canvasHeight + 100 || 
-          this.centerX < -100 || 
-          this.centerX > canvasWidth + 100 ||
-          this.centerZ > 1000 ||
+      // Check if settling is complete (particles fall off screen or expire)
+      const margin = 100; // Large margin to ensure particles are well off screen
+      if (this.centerY > canvasHeight + margin || 
+          this.centerX < -margin || 
+          this.centerX > canvasWidth + margin ||
+          this.centerZ > 1200 ||
           this.settlingTime >= this.settlingDuration) {
         this.complete = true;
         console.log('✅ Particle settled/left screen:', this.centerX, this.centerY, this.centerZ, 'Type:', this.particleType);
@@ -274,7 +288,7 @@ export class Particle {
     this.life--;
     
     // Force completion if life runs out
-    if (this.life <= 0 || (this.phase === 'settling' && this.settlingTime > this.settlingDuration + 5)) {
+    if (this.life <= 0 || (this.phase === 'settling' && this.settlingTime > this.settlingDuration + 8)) {
       this.complete = true;
       console.log('⏰ Particle expired:', this.centerX, this.centerY, this.centerZ);
     }

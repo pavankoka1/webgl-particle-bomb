@@ -58,16 +58,16 @@ export class GlRenderer {
   // Default configuration
   private defaultConfig: ExplosionConfig = {
     particleCount: 400, // More particles for better bomb effect
-    explosionDuration: 0.08, // Much faster explosion (80ms)
-    explosionForce: 1200, // Much stronger explosion force
-    particleRadiusMin: 0.15,
-    particleRadiusMax: 0.6,
-    settlingDuration: 6, // Longer settling for more dramatic effect
-    swingAmplitude: 300, // Much more swing for dramatic debris movement
-    fallSpeed: 3, // Faster fall
-    gravity: 10, // Stronger gravity
-    airResistance: 0.985, // Slightly more air resistance
-    zScatter: 1200, // More Z scatter for depth
+    explosionDuration: 0.12, // Slightly longer explosion for more dramatic effect
+    explosionForce: 1200, // Increased explosion force for more realistic spread
+    particleRadiusMin: 20, // Actual pixel radius (default: 50px)
+    particleRadiusMax: 30, // Actual pixel radius (default: 75px)
+    settlingDuration: 12, // Longer settling for more dramatic effect
+    swingAmplitude: 300, // Increased swing amplitude for better leaf-like motion
+    fallSpeed: 1.2, // Slower fall speed (was 2.5)
+    gravity: 3, // Reduced gravity for slower fall (was 8)
+    airResistance: 0.985, // More air resistance for realistic leaf motion (was 0.99)
+    zScatter: 1200, // Increased Z scatter for more depth variation
     cameraDistance: 10000,
     centerX: 0.5, // 0=left, 1=right
     centerY: 0.8, // 0=bottom, 1=top
@@ -164,18 +164,18 @@ export class GlRenderer {
     const explosionCenterX = burstX;
     const explosionCenterY = burstY;
     
-                  // Start particles from deep Z behind the explosion center
-        const diagonal = Math.sqrt(canvasWidth * canvasWidth + canvasHeight * canvasHeight);
-        const startZ = -diagonal * 4.0; // Much deeper Z start for dramatic approach
+    // Start particles from deep Z behind the explosion center
+    const diagonal = Math.sqrt(canvasWidth * canvasWidth + canvasHeight * canvasHeight);
+    const startZ = -diagonal * 4.0; // Even deeper Z start for more dramatic approach
 
-        for (let i = 0; i < config.particleCount; i++) {
-          // Generate random starting position around the explosion center at deep Z
-          const startRadius = diagonal * 0.02; // Very tight stream for focused explosion
-          const startAngle = Math.random() * 2 * Math.PI;
-          const startX = explosionCenterX + Math.cos(startAngle) * startRadius * Math.random();
-          const startY = explosionCenterY + Math.sin(startAngle) * startRadius * Math.random();
-          const startZ = -diagonal * 4.0 + (Math.random() - 0.5) * diagonal * 0.05; // Deep Z with minimal variation
-      
+    for (let i = 0; i < config.particleCount; i++) {
+      // Generate random starting position around the explosion center at deep Z
+      const startRadius = diagonal * 0.005; // Very tight stream for focused explosion
+      const startAngle = Math.random() * 2 * Math.PI;
+      const startX = explosionCenterX + Math.cos(startAngle) * startRadius * Math.random();
+      const startY = explosionCenterY + Math.sin(startAngle) * startRadius * Math.random();
+      const startZ = -diagonal * 4.0 + (Math.random() - 0.5) * diagonal * 0.01; // Deep Z with minimal variation
+  
       // Calculate direction towards the explosion center (accelerating towards screen)
       const dirX = explosionCenterX - startX;
       const dirY = explosionCenterY - startY;
@@ -185,27 +185,26 @@ export class GlRenderer {
       const normY = dirY / len;
       const normZ = dirZ / len;
       
-              // Approach velocity (accelerating towards explosion center)
-        const approachSpeed = 3000 + Math.random() * 2000; // Extremely fast approach for dramatic effect
-        const approachVelocityX = normX * approachSpeed;
-        const approachVelocityY = normY * approachSpeed;
-        const approachVelocityZ = normZ * approachSpeed;
-      
-      // Calculate explosion scatter (outward from center after explosion)
+      // Approach velocity (accelerating towards explosion center)
+      const approachSpeed = 3000 + Math.random() * 2000; // Faster approach for more dramatic effect
+      const approachVelocityX = normX * approachSpeed;
+      const approachVelocityY = normY * approachSpeed;
+      const approachVelocityZ = normZ * approachSpeed;
+    
+      // Calculate explosion scatter with more realistic physics
       const scatterAngle = Math.random() * 2 * Math.PI;
-      // Massive scatter radius for full-screen bomb explosion
-      const scatterRadius = diagonal * (1.2 + Math.random() * 1.8);
-      let targetX = explosionCenterX + Math.cos(scatterAngle) * scatterRadius;
-      let targetY = explosionCenterY + Math.sin(scatterAngle) * scatterRadius;
-      // Allow particles to go far off-screen for dramatic effect
-      targetX = Math.min(canvasWidth * 2.0, Math.max(canvasWidth * -1.0, targetX));
-      targetY = Math.min(canvasHeight * 2.0, Math.max(canvasHeight * -1.0, targetY));
-      const targetZ = (Math.random() - 0.5) * config.zScatter * 0.3; // Smaller Z scatter
+      // Use realistic explosion radius based on force
+      const explosionRadius = diagonal * (0.4 + Math.random() * 0.6); // Larger radius for more realistic spread
+      let targetX = explosionCenterX + Math.cos(scatterAngle) * explosionRadius;
+      let targetY = explosionCenterY + Math.sin(scatterAngle) * explosionRadius;
       
-              // Explosion velocity (outward from center) - extremely strong for dramatic explosion
-        const explosionSpeed = config.explosionForce * 5 + Math.random() * config.explosionForce * 3;
-      const explosionDirX = (targetX - explosionCenterX) / scatterRadius;
-      const explosionDirY = (targetY - explosionCenterY) / scatterRadius;
+      // NO BOUNDARY CLAMPING - particles can go outside canvas
+      const targetZ = (Math.random() - 0.5) * config.zScatter * 0.3; // More Z scatter
+      
+      // Explosion velocity with more realistic force distribution
+      const explosionSpeed = config.explosionForce * (1.5 + Math.random() * 1.5); // More varied speeds
+      const explosionDirX = (targetX - explosionCenterX) / explosionRadius;
+      const explosionDirY = (targetY - explosionCenterY) / explosionRadius;
       const explosionDirZ = (targetZ - 0) / config.zScatter;
       
       const explosionScatter = {
@@ -214,43 +213,43 @@ export class GlRenderer {
         z: explosionDirZ * explosionSpeed
       };
 
-      // Control points for settling phase
-      const settleX = targetX + (Math.random() - 0.5) * config.swingAmplitude * 2;
-      const settleY = canvasHeight + 200;
-      const settleZ = targetZ + (Math.random() - 0.5) * config.zScatter * 0.3;
+      // Control points for settling phase - NO BOUNDARY CONSTRAINTS
+      const settleX = targetX + (Math.random() - 0.5) * config.swingAmplitude * 2.0; // Allow wider swing
+      const settleY = targetY + Math.random() * canvasHeight * 2.0; // Allow settling below canvas
+      const settleZ = targetZ + (Math.random() - 0.5) * config.zScatter * 0.2;
 
-      // Particle properties
+      // Particle properties with actual pixel radius
       const radius = config.particleRadiusMin + Math.random() * (config.particleRadiusMax - config.particleRadiusMin);
       const scaleX = 0.04 + Math.random() * 0.12;
       const scaleY = 0.05 + Math.random() * 0.15;
       
-      // Decide particle type (15 % fade, 20 % leaf, rest fall)
+      // Decide particle type (15 % fade, 25 % leaf, rest fall)
       const rand = Math.random();
       let particleType: 'fall' | 'fade' | 'leaf';
       if (rand < 0.15) {
         particleType = 'fade';
-      } else if (rand < 0.35) {
+      } else if (rand < 0.40) {
         particleType = 'leaf';
       } else {
         particleType = 'fall';
       }
       
       const swingAmplitude = (particleType === 'leaf' 
-        ? config.swingAmplitude * 1.5   // wider swing for leaves
-        : config.swingAmplitude) * (1.0 + Math.random());
-      const swingFrequency = 1.0 + Math.random() * 3.0; // More varied swing frequency
+        ? config.swingAmplitude * 2.0   // Much wider swing for leaves
+        : config.swingAmplitude) * (1.0 + Math.random() * 0.5);
+      const swingFrequency = 0.8 + Math.random() * 2.0; // More varied swing frequency
       const swingPhase = Math.random() * Math.PI * 2;
-      const rotationSpeedX = (Math.random() - 0.5) * 0.4; // More rotation
-      const rotationSpeedY = (Math.random() - 0.5) * 0.4;
-      const rotationSpeedZ = (Math.random() - 0.5) * 0.4;
+      const rotationSpeedX = (Math.random() - 0.5) * 0.6; // More rotation
+      const rotationSpeedY = (Math.random() - 0.5) * 0.6;
+      const rotationSpeedZ = (Math.random() - 0.5) * 0.6;
       const color: [number, number, number, number] = goldPalette[Math.floor(Math.random() * goldPalette.length)];
       const metallic = config.metallic;
       const roughness = config.roughness;
       const depthA = 80.0 + Math.random() * 160.0;
       const depthB = 70.0 + Math.random() * 140.0;
       const depthScale = 0.04 + Math.random() * 0.12;
-      const fallSpeed = particleType === 'leaf' ? config.fallSpeed * 0.6 : config.fallSpeed;
-      const life = particleType === 'fade' ? 800 + Math.random() * 400 : 1500 + Math.random() * 800;
+      const fallSpeed = particleType === 'leaf' ? config.fallSpeed * 0.4 : config.fallSpeed; // Much slower for leaves
+      const life = particleType === 'fade' ? 1000 + Math.random() * 600 : 2000 + Math.random() * 1000; // Longer life
 
       // Bezier curve control points for settling
       const p0 = { x: explosionCenterX, y: explosionCenterY, z: 0 };
@@ -411,7 +410,7 @@ export class GlRenderer {
 
     // Generate circle vertices
     const segments = 64; // Number of segments to approximate the circle
-    const radius = 75; // Circle radius in pixels
+    const baseRadius = 1; // Base radius for circle geometry (will be scaled by actual radius)
 
     // Don't generate particles here - they will be created by triggerBombExplosion
 
@@ -425,9 +424,9 @@ export class GlRenderer {
       // Center vertex
       positions.push(0, 0);
       // First edge vertex
-      positions.push(angle1, radius);
+      positions.push(angle1, baseRadius);
       // Second edge vertex
-      positions.push(angle2, radius);
+      positions.push(angle2, baseRadius);
     }
 
     this.gl.bufferData(
@@ -475,7 +474,7 @@ export class GlRenderer {
       this.gl.canvas.height
     );
     if (this.radiusUniformLocation) {
-      this.gl.uniform1f(this.radiusUniformLocation, radius);
+      this.gl.uniform1f(this.radiusUniformLocation, 1); // Default radius, will be updated per particle
     }
     if (this.rotationXUniformLocation) {
       this.gl.uniform1f(this.rotationXUniformLocation, 0);

@@ -11,8 +11,8 @@ export const GlWorkshop: FC = () => {
     particleCount: 400, // More particles for better bomb effect
     explosionDuration: 0.08, // Much faster explosion (80ms)
     explosionForce: 800, // Much stronger force for dramatic bomb effect
-    particleRadiusMin: 0.15,
-    particleRadiusMax: 0.6,
+    particleRadiusMin: 12,
+    particleRadiusMax: 20,
     settlingDuration: 6, // Longer settling for more dramatic effect
     swingAmplitude: 200, // More swing for realistic movement
     fallSpeed: 1.8, // Slightly faster fall
@@ -414,28 +414,28 @@ export const GlWorkshop: FC = () => {
               <label style={{ display: "block", marginBottom: "5px" }}>Particle Radius Min:</label>
               <input
                 type="range"
-                min="0.1"
-                max="0.8"
-                step="0.01"
+                min="50"
+                max="75"
+                step="1"
                 value={config.particleRadiusMin}
                 onChange={(e) => setConfig(prev => ({ ...prev, particleRadiusMin: parseFloat(e.target.value) }))}
                 style={{ width: "100%" }}
               />
-              <span style={{ fontSize: "12px", color: "#ccc" }}>{config.particleRadiusMin.toFixed(2)}</span>
+              <span style={{ fontSize: "12px", color: "#ccc" }}>{config.particleRadiusMin.toFixed(0)}px</span>
             </div>
 
             <div style={{ marginBottom: "15px" }}>
               <label style={{ display: "block", marginBottom: "5px" }}>Particle Radius Max:</label>
               <input
                 type="range"
-                min="0.1"
-                max="0.8"
-                step="0.01"
+                min="50"
+                max="75"
+                step="1"
                 value={config.particleRadiusMax}
                 onChange={(e) => setConfig(prev => ({ ...prev, particleRadiusMax: parseFloat(e.target.value) }))}
                 style={{ width: "100%" }}
               />
-              <span style={{ fontSize: "12px", color: "#ccc" }}>{config.particleRadiusMax.toFixed(2)}</span>
+              <span style={{ fontSize: "12px", color: "#ccc" }}>{config.particleRadiusMax.toFixed(0)}px</span>
             </div>
 
             <div style={{ marginBottom: "15px" }}>

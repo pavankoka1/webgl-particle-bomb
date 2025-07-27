@@ -52,11 +52,14 @@ export const VertexShaderSource = `
   void main() {
     // For circles, a_position represents the angle and radius
     float angle = a_position.x;
-    float radius = a_position.y;
+    float baseRadius = a_position.y; // This is the base radius from the circle geometry
+    
+    // Use the actual particle radius from uniform
+    float actualRadius = u_radius;
     
     // Create 3D surface using the formula z = x²/a - y²/b
-    float x = cos(angle) * radius * u_scale.x;
-    float y = sin(angle) * radius * u_scale.y;
+    float x = cos(angle) * actualRadius * u_scale.x;
+    float y = sin(angle) * actualRadius * u_scale.y;
     
     // Apply the formula z = x²/a - y²/b with random parameters
     float a = u_depthA; // Random parameter a for x² term
@@ -79,7 +82,7 @@ export const VertexShaderSource = `
     // Calculate normal for the surface z = x²/a - y²/b
     // The normal is the gradient of the surface: (-2x/a, 2y/b, 1)
     vec3 normal;
-    if (radius > 0.0) {
+    if (baseRadius > 0.0) {
       // Calculate gradient of the surface
       float nx = -2.0 * x / a;
       float ny = 2.0 * y / b;
@@ -98,7 +101,7 @@ export const VertexShaderSource = `
     // Pass to fragment shader
     v_normal = normal;
     v_position = vec3(screenPos, pos3D.z);
-    v_uv = vec2(angle / (2.0 * 3.14159), radius / 100.0);
+    v_uv = vec2(angle / (2.0 * 3.14159), baseRadius / 100.0);
     
     // Convert to clip space (WebGL Y-axis is inverted)
     vec2 zeroToOne = screenPos / u_resolution;
