@@ -194,127 +194,164 @@ export const GlWorkshop: FC = () => {
             <h2 style={{ margin: "0 0 20px 0", color: "#FFB018" }}>Animation Configuration</h2>
 
             <div style={{ marginBottom: "15px" }}>
-              <label style={{ display: "block", marginBottom: "5px" }}>Particle Count:</label>
+              <label title="Number of particles in the explosion (more = denser effect)" style={{ display: "block", marginBottom: "5px" }}>Particle Count:</label>
               <input
                 type="range"
                 min="50"
-                max="500"
+                max="1000"
                 value={config.particleCount}
                 onChange={(e) => setConfig(prev => ({ ...prev, particleCount: parseInt(e.target.value) }))}
                 style={{ width: "100%" }}
+                title="Number of particles in the explosion (more = denser effect)"
               />
               <span style={{ fontSize: "12px", color: "#ccc" }}>{config.particleCount}</span>
             </div>
 
             <div style={{ marginBottom: "15px" }}>
-              <label style={{ display: "block", marginBottom: "5px" }}>Explosion Duration (ms):</label>
+              <label title="How long the explosion phase lasts (in milliseconds)" style={{ display: "block", marginBottom: "5px" }}>Explosion Duration (ms):</label>
               <input
                 type="range"
-                min="1"
-                max="100"
-                step="10"
+                min="10"
+                max="200"
+                step="1"
                 value={config.explosionDuration * 1000}
                 onChange={(e) => setConfig(prev => ({ ...prev, explosionDuration: parseInt(e.target.value) / 1000 }))}
                 style={{ width: "100%" }}
+                title="How long the explosion phase lasts (in milliseconds)"
               />
               <span style={{ fontSize: "12px", color: "#ccc" }}>{Math.round(config.explosionDuration * 1000)}ms</span>
             </div>
 
             <div style={{ marginBottom: "15px" }}>
-              <label style={{ display: "block", marginBottom: "5px" }}>Explosion Force:</label>
+              <label title="How forcefully particles are thrown outward" style={{ display: "block", marginBottom: "5px" }}>Explosion Force:</label>
               <input
                 type="range"
-                min="10"
-                max="1000"
+                min="100"
+                max="4000"
                 value={config.explosionForce}
                 onChange={(e) => setConfig(prev => ({ ...prev, explosionForce: parseInt(e.target.value) }))}
                 style={{ width: "100%" }}
+                title="How forcefully particles are thrown outward"
               />
               <span style={{ fontSize: "12px", color: "#ccc" }}>{config.explosionForce}</span>
             </div>
 
             <div style={{ marginBottom: "15px" }}>
-              <label style={{ display: "block", marginBottom: "5px" }}>Settling Duration (seconds):</label>
+              <label title="Minimum particle radius (in pixels)" style={{ display: "block", marginBottom: "5px" }}>Particle Radius Min:</label>
               <input
                 type="range"
-                min="3"
-                max="15"
+                min="1"
+                max="20"
+                value={config.particleRadiusMin}
+                onChange={(e) => setConfig(prev => ({ ...prev, particleRadiusMin: parseInt(e.target.value) }))}
+                style={{ width: "100%" }}
+                title="Minimum particle radius (in pixels)"
+              />
+              <span style={{ fontSize: "12px", color: "#ccc" }}>{config.particleRadiusMin}</span>
+            </div>
+
+            <div style={{ marginBottom: "15px" }}>
+              <label title="Maximum particle radius (in pixels)" style={{ display: "block", marginBottom: "5px" }}>Particle Radius Max:</label>
+              <input
+                type="range"
+                min="5"
+                max="40"
+                value={config.particleRadiusMax}
+                onChange={(e) => setConfig(prev => ({ ...prev, particleRadiusMax: parseInt(e.target.value) }))}
+                style={{ width: "100%" }}
+                title="Maximum particle radius (in pixels)"
+              />
+              <span style={{ fontSize: "12px", color: "#ccc" }}>{config.particleRadiusMax}</span>
+            </div>
+
+            <div style={{ marginBottom: "15px" }}>
+              <label title="How long particles take to settle after the explosion (in seconds)" style={{ display: "block", marginBottom: "5px" }}>Settling Duration (seconds):</label>
+              <input
+                type="range"
+                min="2"
+                max="20"
                 value={config.settlingDuration}
                 onChange={(e) => setConfig(prev => ({ ...prev, settlingDuration: parseInt(e.target.value) }))}
                 style={{ width: "100%" }}
+                title="How long particles take to settle after the explosion (in seconds)"
               />
               <span style={{ fontSize: "12px", color: "#ccc" }}>{config.settlingDuration}s</span>
             </div>
 
             <div style={{ marginBottom: "15px" }}>
-              <label style={{ display: "block", marginBottom: "5px" }}>Swing Amplitude:</label>
+              <label title="How much particles swing side-to-side as they fall" style={{ display: "block", marginBottom: "5px" }}>Swing Amplitude:</label>
               <input
                 type="range"
-                min="50"
-                max="300"
+                min="0"
+                max="400"
                 value={config.swingAmplitude}
                 onChange={(e) => setConfig(prev => ({ ...prev, swingAmplitude: parseInt(e.target.value) }))}
                 style={{ width: "100%" }}
+                title="How much particles swing side-to-side as they fall"
               />
               <span style={{ fontSize: "12px", color: "#ccc" }}>{config.swingAmplitude}</span>
             </div>
 
             <div style={{ marginBottom: "15px" }}>
-              <label style={{ display: "block", marginBottom: "5px" }}>Fall Speed:</label>
+              <label title="How quickly particles fall (higher = faster)" style={{ display: "block", marginBottom: "5px" }}>Fall Speed:</label>
               <input
                 type="range"
-                min="0.5"
-                max="3"
+                min="0.1"
+                max="5"
                 step="0.1"
                 value={config.fallSpeed}
                 onChange={(e) => setConfig(prev => ({ ...prev, fallSpeed: parseFloat(e.target.value) }))}
                 style={{ width: "100%" }}
+                title="How quickly particles fall (higher = faster)"
               />
               <span style={{ fontSize: "12px", color: "#ccc" }}>{config.fallSpeed}</span>
             </div>
 
             <div style={{ marginBottom: "15px" }}>
-              <label style={{ display: "block", marginBottom: "5px" }}>Gravity:</label>
+              <label title="How strong gravity is (higher = faster downward acceleration)" style={{ display: "block", marginBottom: "5px" }}>Gravity:</label>
               <input
                 type="range"
                 min="1"
-                max="15"
+                max="20"
                 value={config.gravity}
                 onChange={(e) => setConfig(prev => ({ ...prev, gravity: parseInt(e.target.value) }))}
                 style={{ width: "100%" }}
+                title="How strong gravity is (higher = faster downward acceleration)"
               />
               <span style={{ fontSize: "12px", color: "#ccc" }}>{config.gravity}</span>
             </div>
 
             <div style={{ marginBottom: "15px" }}>
-              <label style={{ display: "block", marginBottom: "5px" }}>Air Resistance:</label>
+              <label title="How much air slows down particles (closer to 1 = less resistance)" style={{ display: "block", marginBottom: "5px" }}>Air Resistance:</label>
               <input
                 type="range"
-                min="0.9"
+                min="0.90"
                 max="0.999"
                 step="0.001"
                 value={config.airResistance}
                 onChange={(e) => setConfig(prev => ({ ...prev, airResistance: parseFloat(e.target.value) }))}
                 style={{ width: "100%" }}
+                title="How much air slows down particles (closer to 1 = less resistance)"
               />
               <span style={{ fontSize: "12px", color: "#ccc" }}>{config.airResistance}</span>
             </div>
 
             <div style={{ marginBottom: "15px" }}>
-              <label style={{ display: "block", marginBottom: "5px" }}>Z-Axis Scatter:</label>
+              <label title="How much particles spread out along the z-axis (depth)" style={{ display: "block", marginBottom: "5px" }}>Z-Axis Scatter:</label>
               <input
                 type="range"
-                min="200"
-                max="2000"
+                min="100"
+                max="3000"
                 value={config.zScatter}
                 onChange={(e) => setConfig(prev => ({ ...prev, zScatter: parseInt(e.target.value) }))}
                 style={{ width: "100%" }}
+                title="How much particles spread out along the z-axis (depth)"
               />
               <span style={{ fontSize: "12px", color: "#ccc" }}>{config.zScatter}</span>
             </div>
 
             <div style={{ marginBottom: "15px" }}>
-              <label style={{ display: "block", marginBottom: "5px" }}>Camera Distance:</label>
+              <label title="How far the camera is from the explosion (affects perspective)" style={{ display: "block", marginBottom: "5px" }}>Camera Distance:</label>
               <input
                 type="range"
                 min="5000"
@@ -322,6 +359,7 @@ export const GlWorkshop: FC = () => {
                 value={config.cameraDistance}
                 onChange={(e) => setConfig(prev => ({ ...prev, cameraDistance: parseInt(e.target.value) }))}
                 style={{ width: "100%" }}
+                title="How far the camera is from the explosion (affects perspective)"
               />
               <span style={{ fontSize: "12px", color: "#ccc" }}>{config.cameraDistance}</span>
             </div>
@@ -408,34 +446,6 @@ export const GlWorkshop: FC = () => {
                 style={{ width: "100%" }}
               />
               <span style={{ fontSize: "12px", color: "#ccc" }}>{config.maxY.toFixed(2)}</span>
-            </div>
-
-            <div style={{ marginBottom: "15px" }}>
-              <label style={{ display: "block", marginBottom: "5px" }}>Particle Radius Min:</label>
-              <input
-                type="range"
-                min="50"
-                max="75"
-                step="1"
-                value={config.particleRadiusMin}
-                onChange={(e) => setConfig(prev => ({ ...prev, particleRadiusMin: parseFloat(e.target.value) }))}
-                style={{ width: "100%" }}
-              />
-              <span style={{ fontSize: "12px", color: "#ccc" }}>{config.particleRadiusMin.toFixed(0)}px</span>
-            </div>
-
-            <div style={{ marginBottom: "15px" }}>
-              <label style={{ display: "block", marginBottom: "5px" }}>Particle Radius Max:</label>
-              <input
-                type="range"
-                min="50"
-                max="75"
-                step="1"
-                value={config.particleRadiusMax}
-                onChange={(e) => setConfig(prev => ({ ...prev, particleRadiusMax: parseFloat(e.target.value) }))}
-                style={{ width: "100%" }}
-              />
-              <span style={{ fontSize: "12px", color: "#ccc" }}>{config.particleRadiusMax.toFixed(0)}px</span>
             </div>
 
             <div style={{ marginBottom: "15px" }}>
