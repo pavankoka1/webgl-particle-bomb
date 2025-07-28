@@ -60,14 +60,6 @@ export class Particle {
   p0?: { x: number; y: number; z: number };
   p1?: { x: number; y: number; z: number };
   p2?: { x: number; y: number; z: number };
-  p3?: { x: number; y: number; z: number };
-  targetX?: number;
-  targetY?: number;
-  targetZ?: number;
-  prevX?: number;
-  prevY?: number;
-  prevZ?: number;
-  postExplosionDamping: number;
 
   constructor(
     centerX: number,
@@ -103,11 +95,7 @@ export class Particle {
     velocityZ: number = 0,
     approachTargetZ: number = 0,
     approachSpeed: number = 0,
-    explosionScatter: { x: number; y: number; z: number } | null = null,
-    targetX?: number,
-    targetY?: number,
-    targetZ?: number,
-    postExplosionDamping: number = 0.15
+    explosionScatter: { x: number; y: number; z: number } | null = null
   ) {
     this.centerX = centerX;
     this.centerY = centerY;
@@ -164,54 +152,36 @@ export class Particle {
     this.p0 = p0;
     this.p1 = p1;
     this.p2 = p2;
-    this.p3 = p3;
     this.approachTargetZ = approachTargetZ;
     this.approachSpeed = approachSpeed;
     this.explosionScatter = explosionScatter;
-    this.targetX = targetX;
-    this.targetY = targetY;
-    this.targetZ = targetZ;
-    this.postExplosionDamping = postExplosionDamping;
-  }
-
-  // Cubic Bezier interpolation helper
-  private bezier(t: number, p0: { x: number, y: number, z: number }, p1: { x: number, y: number, z: number }, p2: { x: number, y: number, z: number }, p3: { x: number, y: number, z: number }) {
-    const u = 1 - t;
-    const tt = t * t;
-    const uu = u * u;
-    const uuu = uu * u;
-    const ttt = tt * t;
-    return {
-      x: uuu * p0.x + 3 * uu * t * p1.x + 3 * u * tt * p2.x + ttt * p3.x,
-      y: uuu * p0.y + 3 * uu * t * p1.y + 3 * u * tt * p2.y + ttt * p3.y,
-      z: uuu * p0.z + 3 * uu * t * p1.z + 3 * u * tt * p2.z + ttt * p3.z,
-    };
   }
 
   update(canvasWidth: number, canvasHeight: number) {
     const timeStep = 1 / 60; // 60fps timeStep
 
     if (this.phase === 'approach') {
-      // APPROACH PHASE: Particles follow a cubic Bezier curve from deep Z to explosion center
+      // APPROACH PHASE: Particles accelerate towards explosion center from deep Z
       this.phaseTime += timeStep;
-      const approachDuration = 0; // seconds (visible stream)
-      const t = Math.min(1, this.phaseTime / approachDuration);
-      if (this.p0 && this.p1 && this.p2 && this.p3) {
-        const pos = this.bezier(t, this.p0, this.p1, this.p2, this.p3);
-        this.centerX = pos.x;
-        this.centerY = pos.y;
-        this.centerZ = pos.z;
-      }
+
+      // Update position using approach velocity
+      this.centerX += this.velocityX * timeStep;
+      this.centerY += this.velocityY * timeStep;
+      this.centerZ += this.velocityZ * timeStep;
+
       // Add slight rotation during approach
       this.rotationX += this.rotationSpeedX * 2;
       this.rotationY += this.rotationSpeedY * 2;
       this.rotationZ += this.rotationSpeedZ * 2;
+
       // Scale particles based on Z position for depth effect
-      const depthProgress = (this.centerZ + 2000) / 3000;
-      this.scaleX = 0.1 + depthProgress * 0.9;
+      const depthProgress = (this.centerZ + 2000) / 2000; // Normalize Z progress
+      this.scaleX = 0.1 + depthProgress * 0.9; // Start small, grow as approaching
       this.scaleY = 0.1 + depthProgress * 0.9;
-      // Check if we've reached the explosion center (t >= 1)
-      if (t >= 1) {
+
+      // Check if we've reached the explosion center (Z=0)
+      if (this.centerZ >= -100) { // Within 100px of explosion center
+        // Arrived at explosion center, switch to explosion phase
         this.phase = 'explosion';
         this.phaseTime = 0;
         // Assign outward velocity (explosionScatter)
@@ -220,100 +190,58 @@ export class Particle {
           this.velocityY = this.explosionScatter.y;
           this.velocityZ = this.explosionScatter.z;
         }
-        // Snap to center
-        if (this.p3) {
-          this.centerX = this.p3.x;
-          this.centerY = this.p3.y;
-          this.centerZ = this.p3.z;
-        }
         console.log('💥 Particle reached explosion center, starting explosion');
       }
       return;
     }
 
     if (this.phase === 'explosion') {
-      // EXPLOSION PHASE: Linear interpolation for consistent velocity
+      // EXPLOSION PHASE: Particles burst outward from center
       this.phaseTime += timeStep;
-      if (this.targetX !== undefined && this.targetY !== undefined && this.targetZ !== undefined) {
-        const t = Math.min(1, this.phaseTime / this.explosionDuration);
+      this.centerX += this.velocityX * timeStep;
+      this.centerY += this.velocityY * timeStep;
+      this.centerZ += this.velocityZ * timeStep;
 
-        // LINEAR interpolation for consistent velocity (no ease-out slowdown)
-        const linearT = t;
-
-        // Store previous position
-        this.prevX = this.centerX;
-        this.prevY = this.centerY;
-        this.prevZ = this.centerZ;
-
-        // Interpolate linearly for consistent velocity
-        this.centerX = (1 - linearT) * this.p3!.x + linearT * this.targetX;
-        this.centerY = (1 - linearT) * this.p3!.y + linearT * this.targetY;
-        this.centerZ = (1 - linearT) * this.p3!.z + linearT * this.targetZ;
-      } else {
-        // fallback: move by velocity
-        this.prevX = this.centerX;
-        this.prevY = this.centerY;
-        this.prevZ = this.centerZ;
-        this.centerX += this.velocityX * timeStep;
-        this.centerY += this.velocityY * timeStep;
-        this.centerZ += this.velocityZ * timeStep;
-      }
-      // Moderate rotation during explosion
+      // Moderate rotation during explosion (reduced to prevent glitchy appearance)
       this.rotationX += this.rotationSpeedX * 80;
       this.rotationY += this.rotationSpeedY * 80;
       this.rotationZ += this.rotationSpeedZ * 80;
+
       // Subtle wobble effect during explosion
       const explosionProgress = this.phaseTime / this.explosionDuration;
       this.sy = Math.sin(explosionProgress * Math.PI * 20) * 0.2 + 0.8;
+
       // Check if explosion phase is complete
       if (this.phaseTime >= this.explosionDuration) {
         this.phase = 'settling';
         this.settlingTime = 0;
-
-        // SMOOTH TRANSITION: Calculate velocity from the entire explosion movement
-        if (this.p3 && this.targetX !== undefined && this.targetY !== undefined && this.targetZ !== undefined) {
-          // Calculate velocity based on total explosion movement (linear, so no ease-out factor needed)
-          const totalDistanceX = this.targetX - this.p3.x;
-          const totalDistanceY = this.targetY - this.p3.y;
-          const totalDistanceZ = this.targetZ - this.p3.z;
-
-          // Linear interpolation means velocity is consistent
-          this.velocityX = (totalDistanceX / this.explosionDuration) * this.postExplosionDamping;
-          this.velocityY = (totalDistanceY / this.explosionDuration) * this.postExplosionDamping;
-          this.velocityZ = (totalDistanceZ / this.explosionDuration) * this.postExplosionDamping;
-        } else if (this.prevX !== undefined && this.prevY !== undefined && this.prevZ !== undefined) {
-          // Fallback: use momentum from last frame
-          this.velocityX = (this.centerX - this.prevX) / timeStep * this.postExplosionDamping;
-          this.velocityY = (this.centerY - this.prevY) / timeStep * this.postExplosionDamping;
-          this.velocityZ = (this.centerZ - this.prevZ) / timeStep * this.postExplosionDamping;
-        }
+        // Dampen velocity for more realistic settling
+        const damp = this.particleType === 'leaf' ? 0.4 : 0.6;
+        this.velocityX *= damp;
+        this.velocityY *= damp;
+        this.velocityZ *= damp;
         console.log('💥 Particle explosion complete, entering settling phase');
       }
-      return;
     } else {
       // SETTLING PHASE: Particles fall due to gravity with enhanced swing motion
       this.settlingTime += timeStep;
       this.swingPhase += this.swingFrequency * timeStep;
 
-      // Apply gravity (increased for more dramatic fall)
-      this.velocityY += this.gravity * this.fallSpeed * 1.5; // 50% more dramatic fall
+      // Apply gravity (reduced for slower fall)
+      this.velocityY += this.gravity * this.fallSpeed;
 
-      // Realistic wind vector (slowly changing global wind)
-      const globalWindX = Math.sin((Date.now() / 1000) * 0.2) * 10 + Math.sin(this.settlingTime * 0.1) * 5;
-      const globalWindY = Math.cos((Date.now() / 1000) * 0.15) * 8 + Math.cos(this.settlingTime * 0.13) * 4;
-
-      // Enhanced swing motion for realistic leaf-like debris movement (increased amplitude)
-      const swingX = Math.sin(this.swingPhase) * this.swingAmplitude * 0.015; // Increased
-      const swingY = Math.cos(this.swingPhase * 0.7) * this.swingAmplitude * 0.008; // Increased
-      const swingZ = Math.sin(this.swingPhase * 0.5) * this.swingAmplitude * 0.003; // Increased
+      // Enhanced swing motion for realistic leaf-like debris movement
+      const swingX = Math.sin(this.swingPhase) * this.swingAmplitude * 0.02;
+      const swingY = Math.cos(this.swingPhase * 0.7) * this.swingAmplitude * 0.01;
+      const swingZ = Math.sin(this.swingPhase * 0.5) * this.swingAmplitude * 0.003;
 
       // Additional cross-axis swing for more realistic motion
-      const crossSwingX = Math.sin(this.swingPhase * 1.3) * this.swingAmplitude * 0.010; // Increased
-      const crossSwingY = Math.cos(this.swingPhase * 0.9) * this.swingAmplitude * 0.006; // Increased
+      const crossSwingX = Math.sin(this.swingPhase * 1.3) * this.swingAmplitude * 0.015;
+      const crossSwingY = Math.cos(this.swingPhase * 0.9) * this.swingAmplitude * 0.008;
 
-      // Apply swing forces and wind
-      this.velocityX += swingX + crossSwingX + globalWindX * timeStep;
-      this.velocityY += swingY + crossSwingY + globalWindY * timeStep;
+      // Apply swing forces
+      this.velocityX += swingX + crossSwingX;
+      this.velocityY += swingY + crossSwingY;
       this.velocityZ += swingZ;
 
       // Apply air resistance (more realistic for thin particles)
@@ -326,30 +254,30 @@ export class Particle {
       this.centerY += this.velocityY * timeStep;
       this.centerZ += this.velocityZ * timeStep;
 
-      // Clamp Z position to keep particles visible (but allow more depth)
-      this.centerZ = Math.max(-4000, Math.min(2000, this.centerZ)); // Increased Z range
+      // Clamp Z position to keep particles visible (but allow some depth)
+      this.centerZ = Math.max(-3000, Math.min(1000, this.centerZ));
 
       // NO CANVAS BOUNDARY CONSTRAINTS - particles can freely move outside
       // This allows particles to naturally fall off screen or fly away
 
       // Rotation during fall (more varied for leaf particles)
-      const rotationMultiplier = this.particleType === 'leaf' ? 1.2 : 0.6; // Increased rotation
+      const rotationMultiplier = this.particleType === 'leaf' ? 0.8 : 0.4;
       this.rotationX += this.rotationSpeedX * rotationMultiplier;
       this.rotationY += this.rotationSpeedY * rotationMultiplier;
       this.rotationZ += this.rotationSpeedZ * rotationMultiplier;
 
       // Enhanced wobble effect during settling
-      this.sy = Math.sin(this.swingPhase * 2) * 0.3 + 0.7; // More dramatic wobble
+      this.sy = Math.sin(this.swingPhase * 2) * 0.2 + 0.8;
 
       // Update rotation based on movement direction for realistic orientation
       this.r = Math.atan2(this.velocityY, this.velocityX) + Math.PI * 0.5;
 
       // Check if settling is complete (particles fall off screen or expire)
-      const margin = 300; // Increased margin for more dramatic flow out
+      const margin = 100; // Large margin to ensure particles are well off screen
       if (this.centerY > canvasHeight + margin ||
         this.centerX < -margin ||
         this.centerX > canvasWidth + margin ||
-        this.centerZ > 2500 || // Increased Z limit
+        this.centerZ > 1200 ||
         this.settlingTime >= this.settlingDuration) {
         this.complete = true;
         console.log('✅ Particle settled/left screen:', this.centerX, this.centerY, this.centerZ, 'Type:', this.particleType);
