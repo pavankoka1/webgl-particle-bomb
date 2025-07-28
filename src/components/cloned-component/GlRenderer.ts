@@ -59,7 +59,7 @@ export class GlRenderer {
   private defaultConfig: ExplosionConfig = {
     particleCount: 400, // More particles for better bomb effect
     explosionDuration: 0.12, // Slightly longer explosion for more dramatic effect
-    explosionForce: 1200, // Increased explosion force for more realistic spread
+    explosionForce: 2200, // Increased explosion force for more realistic spread (was 1200)
     particleRadiusMin: 20, // Actual pixel radius (default: 50px)
     particleRadiusMax: 30, // Actual pixel radius (default: 75px)
     settlingDuration: 12, // Longer settling for more dramatic effect
@@ -191,21 +191,26 @@ export class GlRenderer {
       const approachVelocityY = normY * approachSpeed;
       const approachVelocityZ = normZ * approachSpeed;
 
+      // --- REVERT: Restore original explosion velocity logic ---
       // Calculate explosion scatter with more realistic physics
       const scatterAngle = Math.random() * 2 * Math.PI;
       // Use realistic explosion radius based on force
       const explosionRadius = diagonal * (0.4 + Math.random() * 0.6); // Larger radius for more realistic spread
       let targetX = explosionCenterX + Math.cos(scatterAngle) * explosionRadius;
       let targetY = explosionCenterY + Math.sin(scatterAngle) * explosionRadius;
-
       // NO BOUNDARY CLAMPING - particles can go outside canvas
       const targetZ = (Math.random() - 0.5) * config.zScatter * 0.3; // More Z scatter
 
       // Explosion velocity with more realistic force distribution
-      const explosionSpeed = config.explosionForce * (1.5 + Math.random() * 1.5); // More varied speeds
-      const explosionDirX = (targetX - explosionCenterX) / explosionRadius;
-      const explosionDirY = (targetY - explosionCenterY) / explosionRadius;
-      const explosionDirZ = (targetZ - 0) / config.zScatter;
+      let explosionSpeed = config.explosionForce * (1.5 + Math.random() * 1.5); // More varied speeds
+      let explosionDirX = (targetX - explosionCenterX) / explosionRadius;
+      let explosionDirY = (targetY - explosionCenterY) / explosionRadius;
+      let explosionDirZ = (targetZ - 0) / config.zScatter;
+
+      // For 10% of particles, reduce x/y and boost z direction for a more z-axis explosion
+      explosionDirX *= Math.random();
+      explosionDirY *= Math.random();
+      explosionDirZ *= Math.random() * 50;
 
       const explosionScatter = {
         x: explosionDirX * explosionSpeed,

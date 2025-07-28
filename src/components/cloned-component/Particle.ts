@@ -175,7 +175,7 @@ export class Particle {
       this.rotationZ += this.rotationSpeedZ * 2;
 
       // Scale particles based on Z position for depth effect
-      const depthProgress = (this.centerZ + 2000) / 2000; // Normalize Z progress
+      const depthProgress = (this.centerZ + 2000) / 3000; // Normalize Z progress
       this.scaleX = 0.1 + depthProgress * 0.9; // Start small, grow as approaching
       this.scaleY = 0.1 + depthProgress * 0.9;
 
