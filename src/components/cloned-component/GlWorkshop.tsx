@@ -1,6 +1,8 @@
 import type { FC } from "react";
 import { useEffect, useRef, useState } from "react";
-import { GlRenderer, ExplosionConfig } from "./GlRenderer";
+import { GlRenderer, ExplosionConfig as BaseExplosionConfig } from "./GlRenderer";
+
+type ExplosionConfig = BaseExplosionConfig & { explosionContainment: number, postExplosionDamping: number };
 
 export const GlWorkshop: FC = () => {
   const ref = useRef<HTMLCanvasElement>(null);
@@ -9,26 +11,28 @@ export const GlWorkshop: FC = () => {
   const [showConfig, setShowConfig] = useState(false);
   const [config, setConfig] = useState<ExplosionConfig>({
     particleCount: 400, // More particles for better bomb effect
-    explosionDuration: 0.08, // Much faster explosion (80ms)
-    explosionForce: 500, // Much stronger force for dramatic bomb effect
+    explosionDuration: 2, // Fixed duration for all particles (was 0.25)
+    explosionForce: 60, // Lowered for containment
     particleRadiusMin: 4,
     particleRadiusMax: 12,
-    settlingDuration: 6, // Longer settling for more dramatic effect
-    swingAmplitude: 200, // More swing for realistic movement
-    fallSpeed: 1.8, // Slightly faster fall
-    gravity: 6, // Stronger gravity
-    airResistance: 0.985, // Slightly more air resistance
-    zScatter: 1200, // More Z scatter for depth
+    settlingDuration: 8,
+    swingAmplitude: 120, // Lowered for realism
+    fallSpeed: 1.0, // Lowered for realism
+    gravity: 4, // Lowered for realism
+    airResistance: 0.992, // Higher for containment
+    zScatter: 400, // Lowered for containment
     cameraDistance: 10000,
     centerX: 0.5, // 0=left, 1=right
     centerY: 0.8, // 0=bottom, 1=top
     minX: 0.1, // 0=left edge, 1=right edge
-    maxX: 0.9, // 0=left edge, 1=right edge
-    minY: 0.1, // 0=bottom edge, 1=top edge
-    maxY: 0.95, // 0=bottom edge, 1=top edge
+    maxX: 0.9,
+    minY: 0.1,
+    maxY: 0.95,
     metallic: 0.98,
     roughness: 0.08,
     goldColor: [1.0, 0.8, 0.2, 1.0], // #FFCC33
+    explosionContainment: 0.9, // Increased for more realistic flow
+    postExplosionDamping: 0.15
   });
 
   useEffect(() => {
@@ -42,7 +46,7 @@ export const GlWorkshop: FC = () => {
     const resizeCanvas = () => {
       canvas.width = window.innerWidth;
       canvas.height = window.innerHeight;
-      
+
       // Update renderer if it exists
       if (renderer) {
         renderer.resize();
@@ -58,13 +62,13 @@ export const GlWorkshop: FC = () => {
     const glRenderer = new GlRenderer(gl);
     setRenderer(glRenderer);
     glRenderer.start();
-    
+
     // Trigger bomb explosion after a short delay (only once)
     if (!explosionTriggered.current) {
       console.log('🔄 Setting up initial explosion...');
       setTimeout(() => {
         console.log('💥 Triggering initial explosion at:', new Date().toISOString());
-        glRenderer.triggerBombExplosion(undefined, undefined, config);
+        glRenderer.triggerBombExplosion(undefined, undefined, config as BaseExplosionConfig);
         explosionTriggered.current = true;
       }, 500);
     }
@@ -89,7 +93,7 @@ export const GlWorkshop: FC = () => {
   const handleReplay = () => {
     if (renderer) {
       console.log('🔄 Replaying animation with config:', config);
-      renderer.triggerBombExplosion(undefined, undefined, config);
+      renderer.triggerBombExplosion(undefined, undefined, config as BaseExplosionConfig);
     }
   };
 
@@ -97,17 +101,17 @@ export const GlWorkshop: FC = () => {
     setShowConfig(false);
     if (renderer) {
       console.log('⚙️ Applying new config:', config);
-      renderer.triggerBombExplosion(undefined, undefined, config);
+      renderer.triggerBombExplosion(undefined, undefined, config as BaseExplosionConfig);
     }
   };
 
   return (
-    <div style={{ 
-      position: "fixed", 
-      top: 0, 
-      left: 0, 
-      width: "100vw", 
-      height: "100vh", 
+    <div style={{
+      position: "fixed",
+      top: 0,
+      left: 0,
+      width: "100vw",
+      height: "100vh",
       overflow: "hidden",
       backgroundColor: "#000"
     }}>
@@ -192,7 +196,7 @@ export const GlWorkshop: FC = () => {
             overflowY: "auto",
           }}>
             <h2 style={{ margin: "0 0 20px 0", color: "#FFB018" }}>Animation Configuration</h2>
-            
+
             <div style={{ marginBottom: "15px" }}>
               <label style={{ display: "block", marginBottom: "5px" }}>Particle Count:</label>
               <input
@@ -481,6 +485,34 @@ export const GlWorkshop: FC = () => {
                 style={{ width: "100%", height: "30px" }}
               />
               <span style={{ fontSize: "12px", color: "#ccc" }}>{config.goldColor.map(c => c.toFixed(2)).join(", ")}</span>
+            </div>
+
+            <div style={{ marginBottom: "15px" }}>
+              <label style={{ display: "block", marginBottom: "5px" }}>Explosion Containment:</label>
+              <input
+                type="range"
+                min="0.5"
+                max="1.0"
+                step="0.01"
+                value={config.explosionContainment}
+                onChange={(e) => setConfig(prev => ({ ...prev, explosionContainment: parseFloat(e.target.value) }))}
+                style={{ width: "100%" }}
+              />
+              <span style={{ fontSize: "12px", color: "#ccc" }}>{(config.explosionContainment * 100).toFixed(0)}%</span>
+            </div>
+
+            <div style={{ marginBottom: "15px" }}>
+              <label style={{ display: "block", marginBottom: "5px" }}>Post-Explosion Damping:</label>
+              <input
+                type="range"
+                min="0.05"
+                max="0.5"
+                step="0.01"
+                value={config.postExplosionDamping}
+                onChange={(e) => setConfig(prev => ({ ...prev, postExplosionDamping: parseFloat(e.target.value) }))}
+                style={{ width: "100%" }}
+              />
+              <span style={{ fontSize: "12px", color: "#ccc" }}>{(config.postExplosionDamping * 100).toFixed(0)}%</span>
             </div>
 
             <div style={{ display: "flex", gap: "10px", justifyContent: "flex-end" }}>

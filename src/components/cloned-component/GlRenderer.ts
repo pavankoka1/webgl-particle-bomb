@@ -24,6 +24,8 @@ export interface ExplosionConfig {
   metallic: number;
   roughness: number;
   goldColor: [number, number, number, number];
+  explosionContainment?: number; // New: max fraction of canvas for explosion
+  postExplosionDamping?: number;
 }
 
 export class GlRenderer {
@@ -141,7 +143,7 @@ export class GlRenderer {
     config: ExplosionConfig = this.defaultConfig
   ) {
     console.log('🎯 Creating bomb explosion at:', burstX, burstY, 'with config:', config);
-    
+
     // Clear existing particles
     this.particles = [];
     console.log('🧹 Cleared existing particles');
@@ -163,67 +165,67 @@ export class GlRenderer {
     const canvasHeight = this.gl.canvas.height;
     const explosionCenterX = burstX;
     const explosionCenterY = burstY;
-    
+
     // Start particles from deep Z behind the explosion center
     const diagonal = Math.sqrt(canvasWidth * canvasWidth + canvasHeight * canvasHeight);
     const startZ = -diagonal * 4.0; // Even deeper Z start for more dramatic approach
 
     for (let i = 0; i < config.particleCount; i++) {
-      // Generate random starting position around the explosion center at deep Z
-      const startRadius = diagonal * 0.005; // Very tight stream for focused explosion
+      // Generate random starting position in a tight cluster at deep Z
+      const startRadius = diagonal * 0.01 + Math.random() * diagonal * 0.01;
       const startAngle = Math.random() * 2 * Math.PI;
-      const startX = explosionCenterX + Math.cos(startAngle) * startRadius * Math.random();
-      const startY = explosionCenterY + Math.sin(startAngle) * startRadius * Math.random();
-      const startZ = -diagonal * 4.0 + (Math.random() - 0.5) * diagonal * 0.01; // Deep Z with minimal variation
-  
-      // Calculate direction towards the explosion center (accelerating towards screen)
-      const dirX = explosionCenterX - startX;
-      const dirY = explosionCenterY - startY;
-      const dirZ = 0 - startZ; // Towards Z=0 (screen)
-      const len = Math.sqrt(dirX * dirX + dirY * dirY + dirZ * dirZ);
-      const normX = dirX / len;
-      const normY = dirY / len;
-      const normZ = dirZ / len;
-      
-      // Approach velocity (accelerating towards explosion center)
-      const approachSpeed = 3000 + Math.random() * 2000; // Faster approach for more dramatic effect
-      const approachVelocityX = normX * approachSpeed;
-      const approachVelocityY = normY * approachSpeed;
-      const approachVelocityZ = normZ * approachSpeed;
-    
-      // Calculate explosion scatter with more realistic physics
-      const scatterAngle = Math.random() * 2 * Math.PI;
-      // Use realistic explosion radius based on force
-      const explosionRadius = diagonal * (0.4 + Math.random() * 0.6); // Larger radius for more realistic spread
-      let targetX = explosionCenterX + Math.cos(scatterAngle) * explosionRadius;
-      let targetY = explosionCenterY + Math.sin(scatterAngle) * explosionRadius;
-      
-      // NO BOUNDARY CLAMPING - particles can go outside canvas
-      const targetZ = (Math.random() - 0.5) * config.zScatter * 0.3; // More Z scatter
-      
-      // Explosion velocity with more realistic force distribution
-      const explosionSpeed = config.explosionForce * (1.5 + Math.random() * 1.5); // More varied speeds
-      const explosionDirX = (targetX - explosionCenterX) / explosionRadius;
-      const explosionDirY = (targetY - explosionCenterY) / explosionRadius;
-      const explosionDirZ = (targetZ - 0) / config.zScatter;
-      
+      const startX = explosionCenterX + Math.cos(startAngle) * startRadius;
+      const startY = explosionCenterY + Math.sin(startAngle) * startRadius;
+      const startZ = -diagonal * 2.5 + (Math.random() - 0.5) * diagonal * 0.02;
+
+      // Bezier control points for a fast, straight approach
+      const p0 = { x: startX, y: startY, z: startZ };
+      const p1 = {
+        x: explosionCenterX + (Math.random() - 0.5) * 10,
+        y: explosionCenterY + (Math.random() - 0.5) * 10,
+        z: -diagonal * 0.5 + (Math.random() - 0.5) * 10
+      };
+      const p2 = {
+        x: explosionCenterX + (Math.random() - 0.5) * 5,
+        y: explosionCenterY + (Math.random() - 0.5) * 5,
+        z: (Math.random() - 0.5) * 5
+      };
+      const p3 = { x: explosionCenterX, y: explosionCenterY, z: 0 };
+
+      // Same explosion duration for all particles (no randomization)
+      const explosionDuration = 0.2; // 200ms - slightly faster than before
+
+      // REALISTIC: Allow some particles to flow out naturally (not strict containment)
+      const containment = config.explosionContainment ?? 0.9;
+      const minX = (1 - containment) * 0.5 * canvasWidth;
+      const maxX = canvasWidth - minX;
+      const minY = (1 - containment) * 0.5 * canvasHeight;
+      const maxY = canvasHeight - minY;
+
+      // 80% within containment, 20% can flow out naturally
+      const shouldContain = Math.random() < 0.8;
+      let targetX, targetY;
+      if (shouldContain) {
+        targetX = minX + Math.random() * (maxX - minX);
+        targetY = minY + Math.random() * (maxY - minY);
+      } else {
+        // Allow natural flow out - but still reasonable bounds
+        targetX = explosionCenterX + (Math.random() - 0.5) * canvasWidth * 1.5;
+        targetY = explosionCenterY + (Math.random() - 0.5) * canvasHeight * 1.5;
+      }
+      const targetZ = (Math.random() - 0.5) * config.zScatter * 0.3;
+
+      // Velocity to reach target in explosionDuration (slightly faster)
       const explosionScatter = {
-        x: explosionDirX * explosionSpeed,
-        y: explosionDirY * explosionSpeed,
-        z: explosionDirZ * explosionSpeed
+        x: (targetX - explosionCenterX) / explosionDuration * 1.2, // 20% faster
+        y: (targetY - explosionCenterY) / explosionDuration * 1.2,
+        z: (targetZ - 0) / explosionDuration * 1.2
       };
 
-      // Control points for settling phase - NO BOUNDARY CONSTRAINTS
-      const settleX = targetX + (Math.random() - 0.5) * config.swingAmplitude * 2.0; // Allow wider swing
-      const settleY = targetY + Math.random() * canvasHeight * 2.0; // Allow settling below canvas
-      const settleZ = targetZ + (Math.random() - 0.5) * config.zScatter * 0.2;
-
-      // Particle properties with actual pixel radius
+      // Particle properties
       const radius = config.particleRadiusMin + Math.random() * (config.particleRadiusMax - config.particleRadiusMin);
       const scaleX = 0.04 + Math.random() * 0.12;
       const scaleY = 0.05 + Math.random() * 0.15;
-      
-      // Decide particle type (15 % fade, 25 % leaf, rest fall)
       const rand = Math.random();
       let particleType: 'fall' | 'fade' | 'leaf';
       if (rand < 0.15) {
@@ -233,13 +235,11 @@ export class GlRenderer {
       } else {
         particleType = 'fall';
       }
-      
-      const swingAmplitude = (particleType === 'leaf' 
-        ? config.swingAmplitude * 2.0   // Much wider swing for leaves
-        : config.swingAmplitude) * (1.0 + Math.random() * 0.5);
-      const swingFrequency = 0.8 + Math.random() * 2.0; // More varied swing frequency
+      // More natural settling: slower fall, more air resistance
+      const swingAmplitude = (particleType === 'leaf' ? config.swingAmplitude * 1.2 : config.swingAmplitude * 0.7) * (1.0 + Math.random() * 0.5);
+      const swingFrequency = 0.8 + Math.random() * 2.0;
       const swingPhase = Math.random() * Math.PI * 2;
-      const rotationSpeedX = (Math.random() - 0.5) * 0.6; // More rotation
+      const rotationSpeedX = (Math.random() - 0.5) * 0.6;
       const rotationSpeedY = (Math.random() - 0.5) * 0.6;
       const rotationSpeedZ = (Math.random() - 0.5) * 0.6;
       const color: [number, number, number, number] = goldPalette[Math.floor(Math.random() * goldPalette.length)];
@@ -248,18 +248,13 @@ export class GlRenderer {
       const depthA = 80.0 + Math.random() * 160.0;
       const depthB = 70.0 + Math.random() * 140.0;
       const depthScale = 0.04 + Math.random() * 0.12;
-      const fallSpeed = particleType === 'leaf' ? config.fallSpeed * 0.4 : config.fallSpeed; // Much slower for leaves
-      const life = particleType === 'fade' ? 1000 + Math.random() * 600 : 2000 + Math.random() * 1000; // Longer life
-
-      // Bezier curve control points for settling
-      const p0 = { x: explosionCenterX, y: explosionCenterY, z: 0 };
-      const p1 = { x: targetX * 0.3, y: targetY * 0.3, z: targetZ * 0.3 };
-      const p2 = { x: targetX, y: targetY, z: targetZ };
-      const p3 = { x: settleX, y: settleY, z: settleZ };
+      // Slower fall, more air resistance
+      const fallSpeed = particleType === 'leaf' ? config.fallSpeed * 0.3 : config.fallSpeed * 0.6;
+      const life = particleType === 'fade' ? 1000 + Math.random() * 600 : 2000 + Math.random() * 1000;
 
       this.particles.push(
         new Particle(
-          startX, // Start from deep Z position
+          startX,
           startY,
           radius,
           rotationSpeedX,
@@ -274,29 +269,33 @@ export class GlRenderer {
           depthB,
           depthScale,
           life,
-          config.explosionDuration,
+          explosionDuration,
           config.settlingDuration,
           swingAmplitude,
           particleType,
           fallSpeed,
-          config.gravity,
-          config.airResistance,
+          config.gravity * 0.7, // less gravity for slower fall
+          config.airResistance * 1.01, // more air resistance
           p0,
           p1,
           p2,
           p3,
           swingFrequency,
           swingPhase,
-          approachVelocityX, // Start with approach velocity
-          approachVelocityY,
-          approachVelocityZ,
-          0, // Target Z (explosion center)
-          approachSpeed,
-          explosionScatter
+          0, // approachVelocityX (not used)
+          0, // approachVelocityY
+          0, // approachVelocityZ
+          0, // approachTargetZ
+          0, // approachSpeed
+          explosionScatter,
+          targetX,
+          targetY,
+          targetZ,
+          config.postExplosionDamping ?? 0.15 // pass damping
         )
       );
     }
-    
+
     console.log(`✨ Created ${this.particles.length} particles for bomb explosion from deep Z`);
   }
 
@@ -312,7 +311,7 @@ export class GlRenderer {
 
   // Public method to trigger bomb explosion
   public triggerBombExplosion(
-    burstX?: number, 
+    burstX?: number,
     burstY?: number,
     config?: ExplosionConfig
   ) {
@@ -531,12 +530,12 @@ export class GlRenderer {
       particle.update(canvasWidth, canvasHeight);
       return particle.isAlive();
     });
-    
+
     const finalCount = this.particles.length;
     if (initialCount !== finalCount) {
       console.log(`📊 Particles: ${initialCount} -> ${finalCount} (removed ${initialCount - finalCount})`);
     }
-    
+
     // Log if all particles are gone
     if (finalCount === 0 && initialCount > 0) {
       console.log('🎬 All particles have settled or expired');
@@ -576,7 +575,7 @@ export class GlRenderer {
         particle.centerY
       );
     }
-    
+
     if (this.radiusUniformLocation) {
       this.gl.uniform1f(this.radiusUniformLocation, particle.radius);
     }
@@ -612,7 +611,7 @@ export class GlRenderer {
         particle.scaleY * particle.sy // Apply wobble to Y scale
       );
     }
-    
+
     if (this.metallicUniformLocation) {
       this.gl.uniform1f(this.metallicUniformLocation, particle.metallic);
     }
@@ -660,7 +659,7 @@ export class GlRenderer {
   resize() {
     // Update viewport
     this.gl.viewport(0, 0, this.gl.canvas.width, this.gl.canvas.height);
-    
+
     // Update resolution uniform
     const resolutionUniformLocation = this.gl.getUniformLocation(
       this.program,
