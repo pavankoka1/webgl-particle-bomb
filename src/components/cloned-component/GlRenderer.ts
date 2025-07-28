@@ -54,8 +54,8 @@ export class GlRenderer {
   private particles: Particle[] = [];
 
   // Lighting properties - much further away for better depth perception
-  private lightPosition: [number, number, number] = [0, 0, 8000]; // Light much further away
-  private viewPosition: [number, number, number] = [0, 0, 10000]; // View position much further away
+  private lightPosition: [number, number, number] = [0, 0, 12000]; // Light much further away
+  private viewPosition: [number, number, number] = [0, 0, 15000]; // View position much further away
 
   // Default configuration
   private defaultConfig: ExplosionConfig = {
@@ -193,7 +193,7 @@ export class GlRenderer {
       const p3 = { x: explosionCenterX, y: explosionCenterY, z: 0 };
 
       // Same explosion duration for all particles (no randomization)
-      const explosionDuration = 0.2; // 200ms - slightly faster than before
+      const explosionDuration = 0.2; // 200ms - keep this fixed
 
       // REALISTIC: Allow some particles to flow out naturally (not strict containment)
       const containment = config.explosionContainment ?? 0.9;
@@ -213,13 +213,17 @@ export class GlRenderer {
         targetX = explosionCenterX + (Math.random() - 0.5) * canvasWidth * 1.5;
         targetY = explosionCenterY + (Math.random() - 0.5) * canvasHeight * 1.5;
       }
-      const targetZ = (Math.random() - 0.5) * config.zScatter * 0.3;
 
-      // Velocity to reach target in explosionDuration (slightly faster)
+      // DRAMATIC Z-AXIS SCATTER: Much more variation in depth
+      const zScatterRange = config.zScatter * 2.0; // Double the Z scatter
+      const targetZ = (Math.random() - 0.5) * zScatterRange;
+
+      // HIGH VELOCITY EXPLOSION: Much faster velocity for dramatic effect
+      const velocityMultiplier = 3.0; // Triple the velocity for dramatic explosion
       const explosionScatter = {
-        x: (targetX - explosionCenterX) / explosionDuration * 1.2, // 20% faster
-        y: (targetY - explosionCenterY) / explosionDuration * 1.2,
-        z: (targetZ - 0) / explosionDuration * 1.2
+        x: (targetX - explosionCenterX) / explosionDuration * velocityMultiplier,
+        y: (targetY - explosionCenterY) / explosionDuration * velocityMultiplier,
+        z: (targetZ - 0) / explosionDuration * velocityMultiplier
       };
 
       // Particle properties
@@ -491,8 +495,8 @@ export class GlRenderer {
     // Set lighting uniforms - much further away for better depth perception
     const canvasCenterX = this.gl.canvas.width / 2;
     const canvasCenterY = this.gl.canvas.height / 2;
-    this.lightPosition = [canvasCenterX + 800, canvasCenterY - 400, this.defaultConfig.cameraDistance * 0.8];
-    this.viewPosition = [canvasCenterX, canvasCenterY, this.defaultConfig.cameraDistance];
+    this.lightPosition = [canvasCenterX + 800, canvasCenterY - 400, this.defaultConfig.cameraDistance * 1.2];
+    this.viewPosition = [canvasCenterX, canvasCenterY, this.defaultConfig.cameraDistance * 1.5];
 
     if (this.lightPositionUniformLocation) {
       this.gl.uniform3f(this.lightPositionUniformLocation, ...this.lightPosition);

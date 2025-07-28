@@ -207,7 +207,7 @@ export class Particle {
       this.rotationY += this.rotationSpeedY * 2;
       this.rotationZ += this.rotationSpeedZ * 2;
       // Scale particles based on Z position for depth effect
-      const depthProgress = (this.centerZ + 2000) / 4000;
+      const depthProgress = (this.centerZ + 2000) / 3000;
       this.scaleX = 0.1 + depthProgress * 0.9;
       this.scaleY = 0.1 + depthProgress * 0.9;
       // Check if we've reached the explosion center (t >= 1)
@@ -232,23 +232,23 @@ export class Particle {
     }
 
     if (this.phase === 'explosion') {
-      // EXPLOSION PHASE: Interpolate from center to target with ease-out
+      // EXPLOSION PHASE: Linear interpolation for consistent velocity
       this.phaseTime += timeStep;
       if (this.targetX !== undefined && this.targetY !== undefined && this.targetZ !== undefined) {
         const t = Math.min(1, this.phaseTime / this.explosionDuration);
 
-        // EASE-OUT animation: t * (2 - t) for smooth deceleration
-        const easeOutT = t * (2 - t);
+        // LINEAR interpolation for consistent velocity (no ease-out slowdown)
+        const linearT = t;
 
         // Store previous position
         this.prevX = this.centerX;
         this.prevY = this.centerY;
         this.prevZ = this.centerZ;
 
-        // Interpolate with ease-out
-        this.centerX = (1 - easeOutT) * this.p3!.x + easeOutT * this.targetX;
-        this.centerY = (1 - easeOutT) * this.p3!.y + easeOutT * this.targetY;
-        this.centerZ = (1 - easeOutT) * this.p3!.z + easeOutT * this.targetZ;
+        // Interpolate linearly for consistent velocity
+        this.centerX = (1 - linearT) * this.p3!.x + linearT * this.targetX;
+        this.centerY = (1 - linearT) * this.p3!.y + linearT * this.targetY;
+        this.centerZ = (1 - linearT) * this.p3!.z + linearT * this.targetZ;
       } else {
         // fallback: move by velocity
         this.prevX = this.centerX;
@@ -270,19 +270,17 @@ export class Particle {
         this.phase = 'settling';
         this.settlingTime = 0;
 
-        // SMOOTHER TRANSITION: Calculate velocity from the entire explosion movement with ease-out
+        // SMOOTH TRANSITION: Calculate velocity from the entire explosion movement
         if (this.p3 && this.targetX !== undefined && this.targetY !== undefined && this.targetZ !== undefined) {
-          // Calculate velocity based on total explosion movement with ease-out consideration
+          // Calculate velocity based on total explosion movement (linear, so no ease-out factor needed)
           const totalDistanceX = this.targetX - this.p3.x;
           const totalDistanceY = this.targetY - this.p3.y;
           const totalDistanceZ = this.targetZ - this.p3.z;
 
-          // With ease-out, final velocity is lower than average velocity
-          // Use a factor that accounts for the ease-out deceleration
-          const easeOutFactor = 0.6; // Ease-out reduces final velocity
-          this.velocityX = (totalDistanceX / this.explosionDuration) * easeOutFactor * this.postExplosionDamping;
-          this.velocityY = (totalDistanceY / this.explosionDuration) * easeOutFactor * this.postExplosionDamping;
-          this.velocityZ = (totalDistanceZ / this.explosionDuration) * easeOutFactor * this.postExplosionDamping;
+          // Linear interpolation means velocity is consistent
+          this.velocityX = (totalDistanceX / this.explosionDuration) * this.postExplosionDamping;
+          this.velocityY = (totalDistanceY / this.explosionDuration) * this.postExplosionDamping;
+          this.velocityZ = (totalDistanceZ / this.explosionDuration) * this.postExplosionDamping;
         } else if (this.prevX !== undefined && this.prevY !== undefined && this.prevZ !== undefined) {
           // Fallback: use momentum from last frame
           this.velocityX = (this.centerX - this.prevX) / timeStep * this.postExplosionDamping;
@@ -297,21 +295,21 @@ export class Particle {
       this.settlingTime += timeStep;
       this.swingPhase += this.swingFrequency * timeStep;
 
-      // Apply gravity (reduced for slower fall)
-      this.velocityY += this.gravity * this.fallSpeed;
+      // Apply gravity (increased for more dramatic fall)
+      this.velocityY += this.gravity * this.fallSpeed * 1.5; // 50% more dramatic fall
 
       // Realistic wind vector (slowly changing global wind)
       const globalWindX = Math.sin((Date.now() / 1000) * 0.2) * 10 + Math.sin(this.settlingTime * 0.1) * 5;
       const globalWindY = Math.cos((Date.now() / 1000) * 0.15) * 8 + Math.cos(this.settlingTime * 0.13) * 4;
 
-      // Enhanced swing motion for realistic leaf-like debris movement (reduced amplitude)
-      const swingX = Math.sin(this.swingPhase) * this.swingAmplitude * 0.012;
-      const swingY = Math.cos(this.swingPhase * 0.7) * this.swingAmplitude * 0.006;
-      const swingZ = Math.sin(this.swingPhase * 0.5) * this.swingAmplitude * 0.002;
+      // Enhanced swing motion for realistic leaf-like debris movement (increased amplitude)
+      const swingX = Math.sin(this.swingPhase) * this.swingAmplitude * 0.015; // Increased
+      const swingY = Math.cos(this.swingPhase * 0.7) * this.swingAmplitude * 0.008; // Increased
+      const swingZ = Math.sin(this.swingPhase * 0.5) * this.swingAmplitude * 0.003; // Increased
 
       // Additional cross-axis swing for more realistic motion
-      const crossSwingX = Math.sin(this.swingPhase * 1.3) * this.swingAmplitude * 0.008;
-      const crossSwingY = Math.cos(this.swingPhase * 0.9) * this.swingAmplitude * 0.004;
+      const crossSwingX = Math.sin(this.swingPhase * 1.3) * this.swingAmplitude * 0.010; // Increased
+      const crossSwingY = Math.cos(this.swingPhase * 0.9) * this.swingAmplitude * 0.006; // Increased
 
       // Apply swing forces and wind
       this.velocityX += swingX + crossSwingX + globalWindX * timeStep;
@@ -328,30 +326,30 @@ export class Particle {
       this.centerY += this.velocityY * timeStep;
       this.centerZ += this.velocityZ * timeStep;
 
-      // Clamp Z position to keep particles visible (but allow some depth)
-      this.centerZ = Math.max(-3000, Math.min(1000, this.centerZ));
+      // Clamp Z position to keep particles visible (but allow more depth)
+      this.centerZ = Math.max(-4000, Math.min(2000, this.centerZ)); // Increased Z range
 
       // NO CANVAS BOUNDARY CONSTRAINTS - particles can freely move outside
       // This allows particles to naturally fall off screen or fly away
 
       // Rotation during fall (more varied for leaf particles)
-      const rotationMultiplier = this.particleType === 'leaf' ? 0.8 : 0.4;
+      const rotationMultiplier = this.particleType === 'leaf' ? 1.2 : 0.6; // Increased rotation
       this.rotationX += this.rotationSpeedX * rotationMultiplier;
       this.rotationY += this.rotationSpeedY * rotationMultiplier;
       this.rotationZ += this.rotationSpeedZ * rotationMultiplier;
 
       // Enhanced wobble effect during settling
-      this.sy = Math.sin(this.swingPhase * 2) * 0.2 + 0.8;
+      this.sy = Math.sin(this.swingPhase * 2) * 0.3 + 0.7; // More dramatic wobble
 
       // Update rotation based on movement direction for realistic orientation
       this.r = Math.atan2(this.velocityY, this.velocityX) + Math.PI * 0.5;
 
       // Check if settling is complete (particles fall off screen or expire)
-      const margin = 200; // Increased margin to allow more natural flow out (was 100)
+      const margin = 300; // Increased margin for more dramatic flow out
       if (this.centerY > canvasHeight + margin ||
         this.centerX < -margin ||
         this.centerX > canvasWidth + margin ||
-        this.centerZ > 1500 || // Increased Z limit
+        this.centerZ > 2500 || // Increased Z limit
         this.settlingTime >= this.settlingDuration) {
         this.complete = true;
         console.log('✅ Particle settled/left screen:', this.centerX, this.centerY, this.centerZ, 'Type:', this.particleType);
