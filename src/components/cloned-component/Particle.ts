@@ -52,6 +52,10 @@ export class Particle {
   swingPhase: number;
   fallSpeed: number;
 
+  // Wind properties
+  windStrength: number;
+  windDirection: number;
+
   // Animation properties
   r: number = 0;
   sy: number = 1;
@@ -95,7 +99,9 @@ export class Particle {
     velocityZ: number = 0,
     approachTargetZ: number = 0,
     approachSpeed: number = 0,
-    explosionScatter: { x: number; y: number; z: number } | null = null
+    explosionScatter: { x: number; y: number; z: number } | null = null,
+    windStrength: number = 0.0,
+    windDirection: number = 0.0
   ) {
     this.centerX = centerX;
     this.centerY = centerY;
@@ -127,6 +133,8 @@ export class Particle {
     this.swingAmplitude = swingAmplitude;
     this.swingFrequency = swingFrequency;
     this.swingPhase = swingPhase;
+    this.windStrength = windStrength;
+    this.windDirection = windDirection;
 
     // Calculate explosion velocities from Bezier points
     if (p0 && p1 && p2 && p3) {
@@ -230,18 +238,18 @@ export class Particle {
       // Apply gravity (reduced for slower fall)
       this.velocityY += this.gravity * this.fallSpeed;
 
-      // Enhanced swing motion for realistic leaf-like debris movement
-      const swingX = Math.sin(this.swingPhase) * this.swingAmplitude * 0.02;
-      const swingY = Math.cos(this.swingPhase * 0.7) * this.swingAmplitude * 0.01;
-      const swingZ = Math.sin(this.swingPhase * 0.5) * this.swingAmplitude * 0.003;
+      // Configurable wind effect
+      const windX = Math.cos(this.windDirection) * this.windStrength;
+      const windY = Math.sin(this.windDirection) * this.windStrength;
 
-      // Additional cross-axis swing for more realistic motion
-      const crossSwingX = Math.sin(this.swingPhase * 1.3) * this.swingAmplitude * 0.015;
-      const crossSwingY = Math.cos(this.swingPhase * 0.9) * this.swingAmplitude * 0.008;
+      // Reduced swing motion (can be disabled by setting swingAmplitude to 0)
+      const swingX = Math.sin(this.swingPhase) * this.swingAmplitude * 0.01;
+      const swingY = Math.cos(this.swingPhase * 0.7) * this.swingAmplitude * 0.005;
+      const swingZ = Math.sin(this.swingPhase * 0.5) * this.swingAmplitude * 0.001;
 
-      // Apply swing forces
-      this.velocityX += swingX + crossSwingX;
-      this.velocityY += swingY + crossSwingY;
+      // Apply wind and swing forces
+      this.velocityX += windX + swingX;
+      this.velocityY += windY + swingY;
       this.velocityZ += swingZ;
 
       // Apply air resistance (more realistic for thin particles)

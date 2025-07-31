@@ -1,35 +1,88 @@
+/**
+ * GlRenderer - WebGL Particle Explosion System
+ * 
+ * A modular WebGL-based particle explosion system that can be easily imported and used.
+ * 
+ * USAGE EXAMPLE:
+ * ```typescript
+ * import { GlRenderer } from './GlRenderer';
+ * 
+ * // Get WebGL context from canvas
+ * const canvas = document.getElementById('canvas') as HTMLCanvasElement;
+ * const gl = canvas.getContext('webgl');
+ * 
+ * // Create renderer
+ * const renderer = new GlRenderer(gl);
+ * renderer.start();
+ * 
+ * // Trigger explosion with just mode (simplest usage)
+ * renderer.triggerBombExplosion(undefined, undefined, { mode: 'bonus' });
+ * 
+ * // Trigger explosion with custom position and mode
+ * renderer.triggerBombExplosion(100, 200, { mode: 'jackpot' });
+ * 
+ * // Trigger explosion with full custom config
+ * renderer.triggerBombExplosion(undefined, undefined, {
+ *   mode: 'bonus',
+ *   particleCount: 500,
+ *   explosionForce: 3000,
+ *   centerY: 0.2 // 20% from bottom
+ * });
+ * ```
+ */
+
 import { Particle } from "./Particle";
 import { FragmentShaderSource, VertexShaderSource } from "./shaders";
 
 // Animation configuration interface
+export type AnimationMode = 'bonus' | 'jackpot';
+
 export interface ExplosionConfig {
-  particleCount: number;
-  explosionDuration: number;
-  explosionForce: number;
-  particleRadiusMin: number;
-  particleRadiusMax: number;
-  settlingDuration: number;
-  swingAmplitude: number;
-  fallSpeed: number;
-  gravity: number;
-  airResistance: number;
-  zScatter: number;
-  cameraDistance: number;
-  centerX: number;
-  centerY: number;
-  minX: number;
-  maxX: number;
-  minY: number;
-  maxY: number;
-  metallic: number;
-  roughness: number;
-  goldColor: [number, number, number, number];
+  particleCount?: number;
+  explosionDuration?: number;
+  explosionForce?: number;
+  particleRadiusMin?: number;
+  particleRadiusMax?: number;
+  settlingDuration?: number;
+  swingAmplitude?: number;
+  fallSpeed?: number;
+  gravity?: number;
+  airResistance?: number;
+  zScatter?: number;
+  cameraDistance?: number;
+  centerX?: number;
+  centerY?: number;
+  minX?: number;
+  maxX?: number;
+  minY?: number;
+  maxY?: number;
+  metallic?: number;
+  roughness?: number;
+  goldColor?: [number, number, number, number];
   colorPalette?: [number, number, number, number][];
+  windStrength?: number;
+  windDirection?: number;
+  mode?: AnimationMode;
 }
 
 export class GlRenderer {
   private gl: WebGLRenderingContext;
   private program: WebGLProgram;
+
+  // Color palettes for different animation modes
+  private static readonly BONUS_COLORS: [number, number, number, number][] = [
+    [0.847, 0.0, 0.0, 1.0], // #d80000 - Red
+    [0.796, 0.859, 0.243, 1.0], // #cbdb3e - Lime Green
+    [0.886, 0.361, 0.945, 1.0], // #e25cf1 - Magenta
+    [0.149, 0.392, 0.58, 1.0], // #266494 - Blue
+  ];
+
+  private static readonly JACKPOT_COLORS: [number, number, number, number][] = [
+    [0.729, 0.518, 0.2, 1.0], // #ba8433 - Golden Brown
+    [0.98, 0.533, 0.231, 1.0], // #fa883b - Bright Gold
+    [0.741, 0.4, 0.18, 1.0], // #bd662e - Dark Gold
+    [0.239, 0.106, 0.043, 1.0], // #3d1b0b - Deep Brown
+  ];
   private centerUniformLocation: WebGLUniformLocation | null = null;
   private radiusUniformLocation: WebGLUniformLocation | null = null;
   private rotationXUniformLocation: WebGLUniformLocation | null = null;
@@ -56,22 +109,22 @@ export class GlRenderer {
   private lightPosition: [number, number, number] = [0, 0, 8000]; // Light much further away
   private viewPosition: [number, number, number] = [0, 0, 10000]; // View position much further away
 
-  // Default configuration
+  // Default configuration - synced with GlWorkshop
   private defaultConfig: ExplosionConfig = {
-    particleCount: 400, // More particles for better bomb effect
-    explosionDuration: 0.12, // Slightly longer explosion for more dramatic effect
-    explosionForce: 2200, // Increased explosion force for more realistic spread (was 1200)
-    particleRadiusMin: 20, // Actual pixel radius (default: 50px)
-    particleRadiusMax: 30, // Actual pixel radius (default: 75px)
-    settlingDuration: 12, // Longer settling for more dramatic effect
-    swingAmplitude: 300, // Increased swing amplitude for better leaf-like motion
-    fallSpeed: 1.2, // Slower fall speed (was 2.5)
-    gravity: 3, // Reduced gravity for slower fall (was 8)
-    airResistance: 0.985, // More air resistance for realistic leaf motion (was 0.99)
-    zScatter: 1200, // Increased Z scatter for more depth variation
+    particleCount: 300, // More particles for better bomb effect
+    explosionDuration: 0.03, // Much faster explosion (30ms)
+    explosionForce: 5000, // Much stronger force for dramatic bomb effect
+    particleRadiusMin: 4,
+    particleRadiusMax: 12,
+    settlingDuration: 6, // Longer settling for more dramatic effect
+    swingAmplitude: 50, // Reduced swing for more realistic movement
+    fallSpeed: 0.6, // Slightly faster fall
+    gravity: 10, // Stronger gravity
+    airResistance: 0.985, // Slightly more air resistance
+    zScatter: 2000, // More Z scatter for depth
     cameraDistance: 10000,
     centerX: 0.5, // 0=left, 1=right
-    centerY: 0.8, // 0=bottom, 1=top
+    centerY: 0.3, // 0.1 height from bottom
     minX: 0.1, // 0=left edge, 1=right edge
     maxX: 0.9, // 0=left edge, 1=right edge
     minY: 0.1, // 0=bottom edge, 1=top edge
@@ -79,6 +132,8 @@ export class GlRenderer {
     metallic: 0.98,
     roughness: 0.08,
     goldColor: [1.0, 0.8, 0.2, 1.0], // #FFCC33
+    windStrength: 0.0, // No wind by default
+    windDirection: 0.0, // Wind direction in radians
   };
 
   constructor(gl: WebGLRenderingContext) {
@@ -136,40 +191,92 @@ export class GlRenderer {
   }
 
   // Create bomb explosion effect with particles starting from deep Z-axis
+  // CACHE BUST: Updated Y calculation to use (1 - config.centerY) for correct positioning
+  // TIMESTAMP: 2025-07-31T11:08:15 - Force cache clear - FIXED Y CALCULATION - BROWSER CACHE ISSUE - FINAL FIX
   createBombExplosion(
-    burstX: number = this.gl.canvas.width / 2,
-    burstY: number = this.gl.canvas.height / 2,
-    config: ExplosionConfig = this.defaultConfig
+    burstX?: number,
+    burstY?: number,
+    config: Partial<ExplosionConfig> = {}
   ) {
-    console.log('🎯 Creating bomb explosion at:', burstX, burstY, 'with config:', config);
+    // Merge config with defaults, handling optional properties
+    const mergedConfig: ExplosionConfig = {
+      ...this.defaultConfig,
+      ...config
+    };
+
+    // Handle mode-based color palette
+    let colorPalette: [number, number, number, number][];
+    if (config.colorPalette) {
+      colorPalette = config.colorPalette;
+    } else if (config.mode === 'bonus') {
+      colorPalette = GlRenderer.BONUS_COLORS;
+    } else if (config.mode === 'jackpot') {
+      colorPalette = GlRenderer.JACKPOT_COLORS;
+    } else {
+      colorPalette = GlRenderer.JACKPOT_COLORS; // Default to jackpot colors
+    }
+
+    console.log('🚨 FUNCTION CALL DEBUG:', {
+      burstX: burstX,
+      burstY: burstY,
+      configCenterY: mergedConfig.centerY,
+      mode: config.mode,
+      colorPaletteLength: colorPalette.length
+    });
+
+    // Use config center if burst coordinates not provided
+    const explosionCenterX = burstX ?? (this.gl.canvas.width * (mergedConfig.centerX ?? 0.5));
+    // For Y: 0.1 means 10% from bottom, so we need 90% from top
+    const calculatedY = this.gl.canvas.height * (1 - (mergedConfig.centerY ?? 0.1));
+    const explosionCenterY = burstY ?? calculatedY;
+    console.log('🔧 VARIABLE ASSIGNMENT DEBUG:', {
+      calculatedY: calculatedY,
+      explosionCenterY: explosionCenterY,
+      areEqual: calculatedY === explosionCenterY,
+      burstY: burstY
+    });
+    console.log('🔧 CALCULATION DEBUG:', {
+      canvasHeight: this.gl.canvas.height,
+      configCenterY: config.centerY,
+      calculation: `${this.gl.canvas.height} * (1 - ${config.centerY})`,
+      result: calculatedY,
+      actualY: explosionCenterY,
+      burstY: burstY
+    });
+    console.log('🎯 Creating bomb explosion at:', explosionCenterX, explosionCenterY, 'Config centerX:', mergedConfig.centerX, 'Config centerY:', mergedConfig.centerY, 'Canvas size:', this.gl.canvas.width, 'x', this.gl.canvas.height);
+    console.log('🔍 DEBUG: Config being used:', JSON.stringify(mergedConfig, null, 2));
+    console.log('📍 Calculated explosion center:', {
+      x: explosionCenterX,
+      y: explosionCenterY,
+      expectedX: this.gl.canvas.width * (config.centerX ?? 0.5),
+      expectedY: this.gl.canvas.height * (1 - (config.centerY ?? 0.1)),
+      actualY: explosionCenterY,
+      calculation: `${this.gl.canvas.height} * (1 - ${config.centerY ?? 0.1}) = ${this.gl.canvas.height * (1 - (config.centerY ?? 0.1))}`,
+      debug: {
+        canvasHeight: this.gl.canvas.height,
+        configCenterY: config.centerY ?? 0.1,
+        oneMinusCenterY: 1 - (config.centerY ?? 0.1),
+        calculation: this.gl.canvas.height * (1 - (config.centerY ?? 0.1)),
+        directCalculation: this.gl.canvas.height * (config.centerY ?? 0.1)
+      }
+    });
 
     // Clear existing particles
     this.particles = [];
     console.log('🧹 Cleared existing particles');
 
     // Update camera and lighting positions based on config
-    this.viewPosition = [0, 0, config.cameraDistance];
-    this.lightPosition = [0, 0, config.cameraDistance * 0.8];
-
-    // Use provided color palette or default gold palette
-    const colorPalette: [number, number, number, number][] = config.colorPalette || [
-      [0.05, 0.04, 0.03, 1.0], // near black
-      [0.18, 0.13, 0.05, 1.0], // dark brown
-      [0.55, 0.38, 0.13, 1.0], // bronze
-      [0.85, 0.65, 0.13, 1.0], // gold
-      [1.0, 0.8, 0.2, 1.0],    // #FFCC33
-    ];
+    this.viewPosition = [0, 0, mergedConfig.cameraDistance ?? 10000];
+    this.lightPosition = [0, 0, (mergedConfig.cameraDistance ?? 10000) * 0.8];
 
     const canvasWidth = this.gl.canvas.width;
     const canvasHeight = this.gl.canvas.height;
-    const explosionCenterX = burstX;
-    const explosionCenterY = burstY;
 
     // Start particles from deep Z behind the explosion center
     const diagonal = Math.sqrt(canvasWidth * canvasWidth + canvasHeight * canvasHeight);
     const startZ = -diagonal * 4.0; // Even deeper Z start for more dramatic approach
 
-    for (let i = 0; i < config.particleCount; i++) {
+    for (let i = 0; i < (mergedConfig.particleCount ?? 300); i++) {
       // Generate random starting position around the explosion center at deep Z
       const startRadius = diagonal * 0.005; // Very tight stream for focused explosion
       const startAngle = Math.random() * 2 * Math.PI;
@@ -200,17 +307,17 @@ export class GlRenderer {
       let targetX = explosionCenterX + Math.cos(scatterAngle) * explosionRadius;
       let targetY = explosionCenterY + Math.sin(scatterAngle) * explosionRadius;
       // NO BOUNDARY CLAMPING - particles can go outside canvas
-      const targetZ = (Math.random() - 0.5) * config.zScatter * 0.3; // More Z scatter
+      const targetZ = (Math.random() - 0.5) * (mergedConfig.zScatter ?? 2000) * 0.3; // More Z scatter
 
       // Explosion velocity with more realistic force distribution
-      let explosionSpeed = config.explosionForce * (1.5 + Math.random() * 1.5); // More varied speeds
+      let explosionSpeed = (mergedConfig.explosionForce ?? 5000) * (1.0 + Math.random() * 1.0); // More varied speeds
       let explosionDirX = (targetX - explosionCenterX) / explosionRadius;
       let explosionDirY = (targetY - explosionCenterY) / explosionRadius;
-      let explosionDirZ = (targetZ - 0) / config.zScatter;
+      let explosionDirZ = (targetZ - 0) / (mergedConfig.zScatter ?? 2000);
 
       // For 10% of particles, reduce x/y and boost z direction for a more z-axis explosion
-      explosionDirX *= Math.random() * 0.1;
-      explosionDirY *= Math.random() * 0.1;
+      explosionDirX *= Math.random() * 0.4;
+      explosionDirY *= Math.random() * 0.4;
       explosionDirZ *= Math.random() * 50;
 
       const explosionScatter = {
@@ -220,12 +327,12 @@ export class GlRenderer {
       };
 
       // Control points for settling phase - NO BOUNDARY CONSTRAINTS
-      const settleX = targetX + (Math.random() - 0.5) * config.swingAmplitude * 2.0; // Allow wider swing
+      const settleX = targetX + (Math.random() - 0.5) * (mergedConfig.swingAmplitude ?? 50) * 2.0; // Allow wider swing
       const settleY = targetY + Math.random() * canvasHeight * 2.0; // Allow settling below canvas
-      const settleZ = targetZ + (Math.random() - 0.5) * config.zScatter * 0.2;
+      const settleZ = targetZ + (Math.random() - 0.5) * (mergedConfig.zScatter ?? 2000) * 0.2;
 
       // Particle properties with actual pixel radius
-      const radius = config.particleRadiusMin + Math.random() * (config.particleRadiusMax - config.particleRadiusMin);
+      const radius = (mergedConfig.particleRadiusMin ?? 4) + Math.random() * ((mergedConfig.particleRadiusMax ?? 12) - (mergedConfig.particleRadiusMin ?? 4));
       const scaleX = 0.04 + Math.random() * 0.12;
       const scaleY = 0.05 + Math.random() * 0.15;
 
@@ -241,20 +348,20 @@ export class GlRenderer {
       }
 
       const swingAmplitude = (particleType === 'leaf'
-        ? config.swingAmplitude * 2.0   // Much wider swing for leaves
-        : config.swingAmplitude) * (1.0 + Math.random() * 0.5);
+        ? (mergedConfig.swingAmplitude ?? 50) * 2.0   // Much wider swing for leaves
+        : (mergedConfig.swingAmplitude ?? 50)) * (1.0 + Math.random() * 0.5);
       const swingFrequency = 0.8 + Math.random() * 2.0; // More varied swing frequency
       const swingPhase = Math.random() * Math.PI * 2;
-      const rotationSpeedX = (Math.random() - 0.5) * 0.6; // More rotation
-      const rotationSpeedY = (Math.random() - 0.5) * 0.6;
-      const rotationSpeedZ = (Math.random() - 0.5) * 0.6;
+      const rotationSpeedX = (Math.random() - 0.5) * 0.26; // More rotation
+      const rotationSpeedY = (Math.random() - 0.5) * 0.26;
+      const rotationSpeedZ = (Math.random() - 0.5) * 0.56;
       const color: [number, number, number, number] = colorPalette[Math.floor(Math.random() * colorPalette.length)];
-      const metallic = config.metallic;
-      const roughness = config.roughness;
+      const metallic = mergedConfig.metallic;
+      const roughness = mergedConfig.roughness;
       const depthA = 80.0 + Math.random() * 160.0;
       const depthB = 70.0 + Math.random() * 140.0;
       const depthScale = 0.04 + Math.random() * 0.12;
-      const fallSpeed = particleType === 'leaf' ? config.fallSpeed * 0.4 : config.fallSpeed; // Much slower for leaves
+      const fallSpeed = particleType === 'leaf' ? (mergedConfig.fallSpeed ?? 0.6) * 0.4 : (mergedConfig.fallSpeed ?? 0.6); // Much slower for leaves
       const life = particleType === 'fade' ? 1000 + Math.random() * 600 : 2000 + Math.random() * 1000; // Longer life
 
       // Bezier curve control points for settling
@@ -280,13 +387,13 @@ export class GlRenderer {
           depthB,
           depthScale,
           life,
-          config.explosionDuration,
-          config.settlingDuration,
+          mergedConfig.explosionDuration ?? 0.03,
+          mergedConfig.settlingDuration ?? 6,
           swingAmplitude,
           particleType,
           fallSpeed,
-          config.gravity,
-          config.airResistance,
+          mergedConfig.gravity ?? 10,
+          mergedConfig.airResistance ?? 0.985,
           p0,
           p1,
           p2,
@@ -298,7 +405,9 @@ export class GlRenderer {
           approachVelocityZ,
           0, // Target Z (explosion center)
           approachSpeed,
-          explosionScatter
+          explosionScatter,
+          mergedConfig.windStrength ?? 0.0,
+          mergedConfig.windDirection ?? 0.0
         )
       );
     }
@@ -320,12 +429,9 @@ export class GlRenderer {
   public triggerBombExplosion(
     burstX?: number,
     burstY?: number,
-    config?: ExplosionConfig
+    config?: Partial<ExplosionConfig>
   ) {
-    const x = burstX ?? this.gl.canvas.width / 2;
-    const y = burstY ?? this.gl.canvas.height / 2;
-    const explosionConfig = config ?? this.defaultConfig;
-    this.createBombExplosion(x, y, explosionConfig);
+    this.createBombExplosion(burstX, burstY, config);
   }
 
   // Get current default config
@@ -498,8 +604,8 @@ export class GlRenderer {
     // Set lighting uniforms - much further away for better depth perception
     const canvasCenterX = this.gl.canvas.width / 2;
     const canvasCenterY = this.gl.canvas.height / 2;
-    this.lightPosition = [canvasCenterX + 800, canvasCenterY - 400, this.defaultConfig.cameraDistance * 0.8];
-    this.viewPosition = [canvasCenterX, canvasCenterY, this.defaultConfig.cameraDistance];
+    this.lightPosition = [canvasCenterX + 800, canvasCenterY - 400, (this.defaultConfig.cameraDistance ?? 10000) * 0.8];
+    this.viewPosition = [canvasCenterX, canvasCenterY, this.defaultConfig.cameraDistance ?? 10000];
 
     if (this.lightPositionUniformLocation) {
       this.gl.uniform3f(this.lightPositionUniformLocation, ...this.lightPosition);

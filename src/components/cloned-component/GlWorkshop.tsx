@@ -1,26 +1,11 @@
 import type { FC } from "react";
 import { useEffect, useRef, useState } from "react";
-import { GlRenderer, ExplosionConfig } from "./GlRenderer";
+import { GlRenderer, ExplosionConfig, AnimationMode } from "./GlRenderer";
 
 // iPhone 14 Pro Max aspect ratio (width:height = 1290:2796 ≈ 0.461)
 const IPHONE_ASPECT_RATIO = 1290 / 2796; // ≈ 0.461
 
-// Color schemes for different animation types
-const bonusColors: [number, number, number, number][] = [
-  [0.847, 0.0, 0.0, 1.0], // #d80000 - Red
-  [0.796, 0.859, 0.243, 1.0], // #cbdb3e - Lime Green
-  [0.886, 0.361, 0.945, 1.0], // #e25cf1 - Magenta
-  [0.149, 0.392, 0.58, 1.0], // #266494 - Blue
-];
-
-const jackpotColors: [number, number, number, number][] = [
-  [0.729, 0.518, 0.2, 1.0], // #ba8433 - Golden Brown
-  [0.98, 0.533, 0.231, 1.0], // #fa883b - Bright Gold
-  [0.741, 0.4, 0.18, 1.0], // #bd662e - Dark Gold
-  [0.239, 0.106, 0.043, 1.0], // #3d1b0b - Deep Brown
-];
-
-type AnimationType = 'bonus' | 'jackpot';
+type AnimationType = AnimationMode;
 
 export const GlWorkshop: FC = () => {
   const ref = useRef<HTMLCanvasElement>(null);
@@ -31,20 +16,20 @@ export const GlWorkshop: FC = () => {
   const [mobileDimensions, setMobileDimensions] = useState({ width: 0, height: 0 });
 
   const [config, setConfig] = useState<ExplosionConfig>({
-    particleCount: 200, // More particles for better bomb effect
-    explosionDuration: 0.08, // Much faster explosion (80ms)
+    particleCount: 300, // More particles for better bomb effect
+    explosionDuration: 0.03, // Much faster explosion (30ms)
     explosionForce: 5000, // Much stronger force for dramatic bomb effect
     particleRadiusMin: 4,
     particleRadiusMax: 12,
     settlingDuration: 6, // Longer settling for more dramatic effect
-    swingAmplitude: 200, // More swing for realistic movement
-    fallSpeed: 1.2, // Slightly faster fall
-    gravity: 4, // Stronger gravity
+    swingAmplitude: 50, // Reduced swing for more realistic movement
+    fallSpeed: 0.6, // Slightly faster fall
+    gravity: 10, // Stronger gravity
     airResistance: 0.985, // Slightly more air resistance
-    zScatter: 1200, // More Z scatter for depth
+    zScatter: 2000, // More Z scatter for depth
     cameraDistance: 10000,
     centerX: 0.5, // 0=left, 1=right
-    centerY: 0.8, // 0=bottom, 1=top
+    centerY: 0.3, // 0.1 height from bottom
     minX: 0.1, // 0=left edge, 1=right edge
     maxX: 0.9, // 0=left edge, 1=right edge
     minY: 0.1, // 0=bottom edge, 1=top edge
@@ -52,12 +37,11 @@ export const GlWorkshop: FC = () => {
     metallic: 0.98,
     roughness: 0.08,
     goldColor: [1.0, 0.8, 0.2, 1.0], // #FFCC33
+    windStrength: 0.0, // No wind by default
+    windDirection: 0.0, // Wind direction in radians
   });
 
-  // Get current color palette based on animation type
-  const getCurrentColors = (): [number, number, number, number][] => {
-    return animationType === 'bonus' ? bonusColors : jackpotColors;
-  };
+
 
 
 
@@ -101,11 +85,12 @@ export const GlWorkshop: FC = () => {
       console.log('🔄 Setting up initial explosion...');
       setTimeout(() => {
         console.log('💥 Triggering initial explosion at:', new Date().toISOString());
-        const currentConfig = { ...config };
-        currentConfig.colorPalette = getCurrentColors(); // Use current color palette
-        glRenderer.triggerBombExplosion(undefined, undefined, currentConfig);
+        console.log('📊 Config values:', { centerX: config.centerX, centerY: config.centerY });
+        console.log('📐 Canvas dimensions:', canvas.width, 'x', canvas.height);
+        console.log('🔍 DEBUG: Config being passed to triggerBombExplosion:', JSON.stringify({ mode: animationType, ...config }, null, 2));
+        glRenderer.triggerBombExplosion(undefined, undefined, { mode: animationType, ...config });
         explosionTriggered.current = true;
-      }, 500);
+      }, 1000); // Increased delay to ensure canvas is properly sized
     }
 
     // Cleanup
@@ -121,18 +106,15 @@ export const GlWorkshop: FC = () => {
       const x = event.clientX - rect.left;
       const y = event.clientY - rect.top;
       console.log('💥 Manual explosion triggered at:', x, y, 'Time:', new Date().toISOString());
-      const currentConfig = { ...config };
-      currentConfig.colorPalette = getCurrentColors(); // Use current color palette
-      renderer.triggerBombExplosion(x, y, currentConfig);
+      renderer.triggerBombExplosion(x, y, { mode: animationType, ...config });
     }
   };
 
   const handleReplay = () => {
     if (renderer) {
       console.log('🔄 Replaying animation with config:', config);
-      const currentConfig = { ...config };
-      currentConfig.colorPalette = getCurrentColors(); // Use current color palette
-      renderer.triggerBombExplosion(undefined, undefined, currentConfig);
+      console.log('📊 Config values:', { centerX: config.centerX, centerY: config.centerY });
+      renderer.triggerBombExplosion(undefined, undefined, { mode: animationType, ...config });
     }
   };
 
@@ -140,9 +122,8 @@ export const GlWorkshop: FC = () => {
     setShowConfig(false);
     if (renderer) {
       console.log('⚙️ Applying new config:', config);
-      const currentConfig = { ...config };
-      currentConfig.colorPalette = getCurrentColors(); // Use current color palette
-      renderer.triggerBombExplosion(undefined, undefined, currentConfig);
+      console.log('📊 Config values:', { centerX: config.centerX, centerY: config.centerY });
+      renderer.triggerBombExplosion(undefined, undefined, { mode: animationType, ...config });
     }
   };
 
@@ -150,9 +131,8 @@ export const GlWorkshop: FC = () => {
     setAnimationType(newType);
     if (renderer) {
       console.log(`🎨 Switching to ${newType} animation`);
-      const currentConfig = { ...config };
-      currentConfig.colorPalette = getCurrentColors(); // Use current color palette
-      renderer.triggerBombExplosion(undefined, undefined, currentConfig);
+      console.log('📊 Config values:', { centerX: config.centerX, centerY: config.centerY });
+      renderer.triggerBombExplosion(undefined, undefined, { mode: newType, ...config });
     }
   };
 
@@ -371,14 +351,14 @@ export const GlWorkshop: FC = () => {
               <input
                 type="range"
                 min="10"
-                max="200"
+                max="100"
                 step="1"
-                value={config.explosionDuration * 1000}
+                value={(config.explosionDuration ?? 0.03) * 1000}
                 onChange={(e) => setConfig(prev => ({ ...prev, explosionDuration: parseInt(e.target.value) / 1000 }))}
                 style={{ width: "100%" }}
                 title="How long the explosion phase lasts (in milliseconds)"
               />
-              <span style={{ fontSize: "12px", color: "#ccc" }}>{Math.round(config.explosionDuration * 1000)}ms</span>
+              <span style={{ fontSize: "12px", color: "#ccc" }}>{Math.round((config.explosionDuration ?? 0.03) * 1000)}ms</span>
             </div>
 
             <div style={{ marginBottom: "15px" }}>
@@ -386,7 +366,7 @@ export const GlWorkshop: FC = () => {
               <input
                 type="range"
                 min="100"
-                max="4000"
+                max="8000"
                 value={config.explosionForce}
                 onChange={(e) => setConfig(prev => ({ ...prev, explosionForce: parseInt(e.target.value) }))}
                 style={{ width: "100%" }}
@@ -442,7 +422,7 @@ export const GlWorkshop: FC = () => {
               <input
                 type="range"
                 min="0"
-                max="400"
+                max="200"
                 value={config.swingAmplitude}
                 onChange={(e) => setConfig(prev => ({ ...prev, swingAmplitude: parseInt(e.target.value) }))}
                 style={{ width: "100%" }}
@@ -496,6 +476,36 @@ export const GlWorkshop: FC = () => {
             </div>
 
             <div style={{ marginBottom: "15px" }}>
+              <label title="Wind strength affecting particle movement (0 = no wind)" style={{ display: "block", marginBottom: "5px" }}>Wind Strength:</label>
+              <input
+                type="range"
+                min="0"
+                max="100"
+                step="1"
+                value={config.windStrength}
+                onChange={(e) => setConfig(prev => ({ ...prev, windStrength: parseFloat(e.target.value) }))}
+                style={{ width: "100%" }}
+                title="Wind strength affecting particle movement (0 = no wind)"
+              />
+              <span style={{ fontSize: "12px", color: "#ccc" }}>{config.windStrength}</span>
+            </div>
+
+            <div style={{ marginBottom: "15px" }}>
+              <label title="Wind direction in degrees (0 = right, 90 = up, 180 = left, 270 = down)" style={{ display: "block", marginBottom: "5px" }}>Wind Direction (degrees):</label>
+              <input
+                type="range"
+                min="0"
+                max="360"
+                step="1"
+                value={((config.windDirection ?? 0) * 180 / Math.PI)}
+                onChange={(e) => setConfig(prev => ({ ...prev, windDirection: parseFloat(e.target.value) * Math.PI / 180 }))}
+                style={{ width: "100%" }}
+                title="Wind direction in degrees (0 = right, 90 = up, 180 = left, 270 = down)"
+              />
+              <span style={{ fontSize: "12px", color: "#ccc" }}>{Math.round((config.windDirection ?? 0) * 180 / Math.PI)}°</span>
+            </div>
+
+            <div style={{ marginBottom: "15px" }}>
               <label title="How much particles spread out along the z-axis (depth)" style={{ display: "block", marginBottom: "5px" }}>Z-Axis Scatter:</label>
               <input
                 type="range"
@@ -534,7 +544,7 @@ export const GlWorkshop: FC = () => {
                 onChange={(e) => setConfig(prev => ({ ...prev, centerX: parseFloat(e.target.value) }))}
                 style={{ width: "100%" }}
               />
-              <span style={{ fontSize: "12px", color: "#ccc" }}>{config.centerX.toFixed(2)}</span>
+              <span style={{ fontSize: "12px", color: "#ccc" }}>{(config.centerX ?? 0.5).toFixed(2)}</span>
             </div>
 
             <div style={{ marginBottom: "15px" }}>
@@ -548,7 +558,7 @@ export const GlWorkshop: FC = () => {
                 onChange={(e) => setConfig(prev => ({ ...prev, centerY: parseFloat(e.target.value) }))}
                 style={{ width: "100%" }}
               />
-              <span style={{ fontSize: "12px", color: "#ccc" }}>{config.centerY.toFixed(2)}</span>
+              <span style={{ fontSize: "12px", color: "#ccc" }}>{(config.centerY ?? 0.1).toFixed(2)}</span>
             </div>
 
             <div style={{ marginBottom: "15px" }}>
@@ -562,7 +572,7 @@ export const GlWorkshop: FC = () => {
                 onChange={(e) => setConfig(prev => ({ ...prev, minX: parseFloat(e.target.value) }))}
                 style={{ width: "100%" }}
               />
-              <span style={{ fontSize: "12px", color: "#ccc" }}>{config.minX.toFixed(2)}</span>
+              <span style={{ fontSize: "12px", color: "#ccc" }}>{(config.minX ?? 0.1).toFixed(2)}</span>
             </div>
 
             <div style={{ marginBottom: "15px" }}>
@@ -572,11 +582,11 @@ export const GlWorkshop: FC = () => {
                 min="0"
                 max="1"
                 step="0.01"
-                value={config.maxX}
+                value={config.maxX ?? 0.9}
                 onChange={(e) => setConfig(prev => ({ ...prev, maxX: parseFloat(e.target.value) }))}
                 style={{ width: "100%" }}
               />
-              <span style={{ fontSize: "12px", color: "#ccc" }}>{config.maxX.toFixed(2)}</span>
+              <span style={{ fontSize: "12px", color: "#ccc" }}>{(config.maxX ?? 0.9).toFixed(2)}</span>
             </div>
 
             <div style={{ marginBottom: "15px" }}>
@@ -586,11 +596,11 @@ export const GlWorkshop: FC = () => {
                 min="0"
                 max="1"
                 step="0.01"
-                value={config.minY}
+                value={config.minY ?? 0.1}
                 onChange={(e) => setConfig(prev => ({ ...prev, minY: parseFloat(e.target.value) }))}
                 style={{ width: "100%" }}
               />
-              <span style={{ fontSize: "12px", color: "#ccc" }}>{config.minY.toFixed(2)}</span>
+              <span style={{ fontSize: "12px", color: "#ccc" }}>{(config.minY ?? 0.1).toFixed(2)}</span>
             </div>
 
             <div style={{ marginBottom: "15px" }}>
@@ -600,11 +610,11 @@ export const GlWorkshop: FC = () => {
                 min="0"
                 max="1"
                 step="0.01"
-                value={config.maxY}
+                value={config.maxY ?? 0.95}
                 onChange={(e) => setConfig(prev => ({ ...prev, maxY: parseFloat(e.target.value) }))}
                 style={{ width: "100%" }}
               />
-              <span style={{ fontSize: "12px", color: "#ccc" }}>{config.maxY.toFixed(2)}</span>
+              <span style={{ fontSize: "12px", color: "#ccc" }}>{(config.maxY ?? 0.95).toFixed(2)}</span>
             </div>
 
             <div style={{ marginBottom: "15px" }}>
@@ -614,11 +624,11 @@ export const GlWorkshop: FC = () => {
                 min="0"
                 max="1"
                 step="0.01"
-                value={config.metallic}
+                value={config.metallic ?? 0.98}
                 onChange={(e) => setConfig(prev => ({ ...prev, metallic: parseFloat(e.target.value) }))}
                 style={{ width: "100%" }}
               />
-              <span style={{ fontSize: "12px", color: "#ccc" }}>{config.metallic.toFixed(2)}</span>
+              <span style={{ fontSize: "12px", color: "#ccc" }}>{(config.metallic ?? 0.98).toFixed(2)}</span>
             </div>
 
             <div style={{ marginBottom: "15px" }}>
@@ -628,18 +638,18 @@ export const GlWorkshop: FC = () => {
                 min="0"
                 max="1"
                 step="0.01"
-                value={config.roughness}
+                value={config.roughness ?? 0.08}
                 onChange={(e) => setConfig(prev => ({ ...prev, roughness: parseFloat(e.target.value) }))}
                 style={{ width: "100%" }}
               />
-              <span style={{ fontSize: "12px", color: "#ccc" }}>{config.roughness.toFixed(2)}</span>
+              <span style={{ fontSize: "12px", color: "#ccc" }}>{(config.roughness ?? 0.08).toFixed(2)}</span>
             </div>
 
             <div style={{ marginBottom: "15px" }}>
               <label style={{ display: "block", marginBottom: "5px" }}>Gold Color (R, G, B):</label>
               <input
                 type="color"
-                value={`#${((1 << 24) + (Math.round(config.goldColor[0] * 255) << 16) + (Math.round(config.goldColor[1] * 255) << 8) + Math.round(config.goldColor[2] * 255)).toString(16).slice(1, 7)}`}
+                value={`#${((1 << 24) + (Math.round((config.goldColor?.[0] ?? 1.0) * 255) << 16) + (Math.round((config.goldColor?.[1] ?? 0.8) * 255) << 8) + Math.round((config.goldColor?.[2] ?? 0.2) * 255)).toString(16).slice(1, 7)}`}
                 onChange={(e) => {
                   const hex = e.target.value;
                   const r = parseInt(hex.slice(1, 3), 16) / 255;
@@ -649,7 +659,7 @@ export const GlWorkshop: FC = () => {
                 }}
                 style={{ width: "100%", height: "30px" }}
               />
-              <span style={{ fontSize: "12px", color: "#ccc" }}>{config.goldColor.map(c => c.toFixed(2)).join(", ")}</span>
+              <span style={{ fontSize: "12px", color: "#ccc" }}>{(config.goldColor ?? [1.0, 0.8, 0.2, 1.0]).map(c => c.toFixed(2)).join(", ")}</span>
             </div>
 
             <div style={{ display: "flex", gap: "10px", justifyContent: "flex-end" }}>
