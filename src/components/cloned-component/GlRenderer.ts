@@ -24,6 +24,7 @@ export interface ExplosionConfig {
   metallic: number;
   roughness: number;
   goldColor: [number, number, number, number];
+  colorPalette?: [number, number, number, number][];
 }
 
 export class GlRenderer {
@@ -150,8 +151,8 @@ export class GlRenderer {
     this.viewPosition = [0, 0, config.cameraDistance];
     this.lightPosition = [0, 0, config.cameraDistance * 0.8];
 
-    // Gold palette: black, dark brown, bronze, gold, #FFCC33
-    const goldPalette: [number, number, number, number][] = [
+    // Use provided color palette or default gold palette
+    const colorPalette: [number, number, number, number][] = config.colorPalette || [
       [0.05, 0.04, 0.03, 1.0], // near black
       [0.18, 0.13, 0.05, 1.0], // dark brown
       [0.55, 0.38, 0.13, 1.0], // bronze
@@ -208,8 +209,8 @@ export class GlRenderer {
       let explosionDirZ = (targetZ - 0) / config.zScatter;
 
       // For 10% of particles, reduce x/y and boost z direction for a more z-axis explosion
-      explosionDirX *= Math.random();
-      explosionDirY *= Math.random();
+      explosionDirX *= Math.random() * 0.1;
+      explosionDirY *= Math.random() * 0.1;
       explosionDirZ *= Math.random() * 50;
 
       const explosionScatter = {
@@ -247,7 +248,7 @@ export class GlRenderer {
       const rotationSpeedX = (Math.random() - 0.5) * 0.6; // More rotation
       const rotationSpeedY = (Math.random() - 0.5) * 0.6;
       const rotationSpeedZ = (Math.random() - 0.5) * 0.6;
-      const color: [number, number, number, number] = goldPalette[Math.floor(Math.random() * goldPalette.length)];
+      const color: [number, number, number, number] = colorPalette[Math.floor(Math.random() * colorPalette.length)];
       const metallic = config.metallic;
       const roughness = config.roughness;
       const depthA = 80.0 + Math.random() * 160.0;

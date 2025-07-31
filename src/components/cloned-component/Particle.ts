@@ -216,7 +216,7 @@ export class Particle {
         this.phase = 'settling';
         this.settlingTime = 0;
         // Dampen velocity for more realistic settling
-        const damp = this.particleType === 'leaf' ? 0.4 : 0.6;
+        const damp = this.particleType === 'leaf' ? 0.2 : 0.6;
         this.velocityX *= damp;
         this.velocityY *= damp;
         this.velocityZ *= damp;

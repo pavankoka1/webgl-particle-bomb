@@ -2,21 +2,44 @@ import type { FC } from "react";
 import { useEffect, useRef, useState } from "react";
 import { GlRenderer, ExplosionConfig } from "./GlRenderer";
 
+// iPhone 14 Pro Max aspect ratio (width:height = 1290:2796 ≈ 0.461)
+const IPHONE_ASPECT_RATIO = 1290 / 2796; // ≈ 0.461
+
+// Color schemes for different animation types
+const bonusColors: [number, number, number, number][] = [
+  [0.847, 0.0, 0.0, 1.0], // #d80000 - Red
+  [0.796, 0.859, 0.243, 1.0], // #cbdb3e - Lime Green
+  [0.886, 0.361, 0.945, 1.0], // #e25cf1 - Magenta
+  [0.149, 0.392, 0.58, 1.0], // #266494 - Blue
+];
+
+const jackpotColors: [number, number, number, number][] = [
+  [0.729, 0.518, 0.2, 1.0], // #ba8433 - Golden Brown
+  [0.98, 0.533, 0.231, 1.0], // #fa883b - Bright Gold
+  [0.741, 0.4, 0.18, 1.0], // #bd662e - Dark Gold
+  [0.239, 0.106, 0.043, 1.0], // #3d1b0b - Deep Brown
+];
+
+type AnimationType = 'bonus' | 'jackpot';
+
 export const GlWorkshop: FC = () => {
   const ref = useRef<HTMLCanvasElement>(null);
   const [renderer, setRenderer] = useState<GlRenderer | null>(null);
   const explosionTriggered = useRef(false);
   const [showConfig, setShowConfig] = useState(false);
+  const [animationType, setAnimationType] = useState<AnimationType>('bonus');
+  const [mobileDimensions, setMobileDimensions] = useState({ width: 0, height: 0 });
+
   const [config, setConfig] = useState<ExplosionConfig>({
-    particleCount: 400, // More particles for better bomb effect
+    particleCount: 200, // More particles for better bomb effect
     explosionDuration: 0.08, // Much faster explosion (80ms)
-    explosionForce: 2000, // Much stronger force for dramatic bomb effect
+    explosionForce: 5000, // Much stronger force for dramatic bomb effect
     particleRadiusMin: 4,
     particleRadiusMax: 12,
     settlingDuration: 6, // Longer settling for more dramatic effect
     swingAmplitude: 200, // More swing for realistic movement
-    fallSpeed: 1.8, // Slightly faster fall
-    gravity: 6, // Stronger gravity
+    fallSpeed: 1.2, // Slightly faster fall
+    gravity: 4, // Stronger gravity
     airResistance: 0.985, // Slightly more air resistance
     zScatter: 1200, // More Z scatter for depth
     cameraDistance: 10000,
@@ -31,6 +54,13 @@ export const GlWorkshop: FC = () => {
     goldColor: [1.0, 0.8, 0.2, 1.0], // #FFCC33
   });
 
+  // Get current color palette based on animation type
+  const getCurrentColors = (): [number, number, number, number][] => {
+    return animationType === 'bonus' ? bonusColors : jackpotColors;
+  };
+
+
+
   useEffect(() => {
     const canvas = ref.current;
     if (!canvas) return;
@@ -38,10 +68,17 @@ export const GlWorkshop: FC = () => {
     const gl = canvas.getContext("webgl");
     if (!gl) return;
 
-    // Set canvas to full screen
+    // Set canvas to iPhone aspect ratio with 80-85% screen height
     const resizeCanvas = () => {
-      canvas.width = window.innerWidth;
-      canvas.height = window.innerHeight;
+      const screenHeight = window.innerHeight;
+      const targetHeight = screenHeight * 0.82; // 82% of screen height
+      const targetWidth = targetHeight * IPHONE_ASPECT_RATIO;
+
+      canvas.width = targetWidth;
+      canvas.height = targetHeight;
+
+      // Update mobile dimensions state
+      setMobileDimensions({ width: targetWidth, height: targetHeight });
 
       // Update renderer if it exists
       if (renderer) {
@@ -64,7 +101,9 @@ export const GlWorkshop: FC = () => {
       console.log('🔄 Setting up initial explosion...');
       setTimeout(() => {
         console.log('💥 Triggering initial explosion at:', new Date().toISOString());
-        glRenderer.triggerBombExplosion(undefined, undefined, config);
+        const currentConfig = { ...config };
+        currentConfig.colorPalette = getCurrentColors(); // Use current color palette
+        glRenderer.triggerBombExplosion(undefined, undefined, currentConfig);
         explosionTriggered.current = true;
       }, 500);
     }
@@ -82,14 +121,18 @@ export const GlWorkshop: FC = () => {
       const x = event.clientX - rect.left;
       const y = event.clientY - rect.top;
       console.log('💥 Manual explosion triggered at:', x, y, 'Time:', new Date().toISOString());
-      renderer.triggerBombExplosion(x, y, config);
+      const currentConfig = { ...config };
+      currentConfig.colorPalette = getCurrentColors(); // Use current color palette
+      renderer.triggerBombExplosion(x, y, currentConfig);
     }
   };
 
   const handleReplay = () => {
     if (renderer) {
       console.log('🔄 Replaying animation with config:', config);
-      renderer.triggerBombExplosion(undefined, undefined, config);
+      const currentConfig = { ...config };
+      currentConfig.colorPalette = getCurrentColors(); // Use current color palette
+      renderer.triggerBombExplosion(undefined, undefined, currentConfig);
     }
   };
 
@@ -97,7 +140,19 @@ export const GlWorkshop: FC = () => {
     setShowConfig(false);
     if (renderer) {
       console.log('⚙️ Applying new config:', config);
-      renderer.triggerBombExplosion(undefined, undefined, config);
+      const currentConfig = { ...config };
+      currentConfig.colorPalette = getCurrentColors(); // Use current color palette
+      renderer.triggerBombExplosion(undefined, undefined, currentConfig);
+    }
+  };
+
+  const handleAnimationTypeChange = (newType: AnimationType) => {
+    setAnimationType(newType);
+    if (renderer) {
+      console.log(`🎨 Switching to ${newType} animation`);
+      const currentConfig = { ...config };
+      currentConfig.colorPalette = getCurrentColors(); // Use current color palette
+      renderer.triggerBombExplosion(undefined, undefined, currentConfig);
     }
   };
 
@@ -109,25 +164,87 @@ export const GlWorkshop: FC = () => {
       width: "100vw",
       height: "100vh",
       overflow: "hidden",
-      backgroundColor: "#000"
+      backgroundColor: "#000",
+      display: "flex",
+      justifyContent: "center",
+      alignItems: "center",
     }}>
-      <canvas
-        ref={ref}
-        onClick={handleCanvasClick}
-        style={{
-          display: "block",
-          width: "100%",
-          height: "100%",
-          cursor: "pointer",
-        }}
-      />
+      {/* Mobile-shaped container */}
+      <div style={{
+        position: "relative",
+        width: mobileDimensions.width || window.innerHeight * 0.82 * IPHONE_ASPECT_RATIO,
+        height: mobileDimensions.height || window.innerHeight * 0.82,
+        backgroundColor: "transparent",
+        borderRadius: "60px",
+        border: "8px solid #333",
+        boxShadow: "0 0 50px rgba(0,0,0,0.8)",
+        overflow: "hidden",
+      }}>
+        <canvas
+          ref={ref}
+          onClick={handleCanvasClick}
+          style={{
+            display: "block",
+            width: "100%",
+            height: "100%",
+            cursor: "pointer",
+            backgroundColor: "transparent",
+          }}
+        />
+      </div>
 
-      {/* Replay Button */}
+      {/* Animation Type Toggle - Top Left */}
+      <div style={{
+        position: "absolute",
+        top: "20px",
+        left: "20px",
+        display: "flex",
+        gap: "10px",
+        zIndex: 1000,
+        pointerEvents: "auto",
+      }}>
+        <button
+          onClick={() => handleAnimationTypeChange('bonus')}
+          style={{
+            padding: "12px 20px",
+            fontSize: "14px",
+            fontWeight: "bold",
+            backgroundColor: animationType === 'bonus' ? "#d80000" : "#333",
+            color: "#fff",
+            border: "none",
+            borderRadius: "8px",
+            cursor: "pointer",
+            boxShadow: "0 4px 8px rgba(0,0,0,0.3)",
+            transition: "all 0.3s ease",
+          }}
+        >
+          🎯 Bonus Round
+        </button>
+        <button
+          onClick={() => handleAnimationTypeChange('jackpot')}
+          style={{
+            padding: "12px 20px",
+            fontSize: "14px",
+            fontWeight: "bold",
+            backgroundColor: animationType === 'jackpot' ? "#fa883b" : "#333",
+            color: "#fff",
+            border: "none",
+            borderRadius: "8px",
+            cursor: "pointer",
+            boxShadow: "0 4px 8px rgba(0,0,0,0.3)",
+            transition: "all 0.3s ease",
+          }}
+        >
+          🏆 Jackpot Round
+        </button>
+      </div>
+
+      {/* Replay Button - Bottom Left */}
       <button
         onClick={handleReplay}
         style={{
           position: "absolute",
-          top: "20px",
+          bottom: "20px",
           left: "20px",
           padding: "12px 24px",
           fontSize: "16px",
@@ -138,13 +255,14 @@ export const GlWorkshop: FC = () => {
           borderRadius: "8px",
           cursor: "pointer",
           boxShadow: "0 4px 8px rgba(0,0,0,0.3)",
-          zIndex: 10,
+          zIndex: 1000,
+          pointerEvents: "auto",
         }}
       >
         🔄 Replay
       </button>
 
-      {/* Config Button */}
+      {/* Config Button - Top Right */}
       <button
         onClick={() => setShowConfig(true)}
         style={{
@@ -160,7 +278,8 @@ export const GlWorkshop: FC = () => {
           borderRadius: "8px",
           cursor: "pointer",
           boxShadow: "0 4px 8px rgba(0,0,0,0.3)",
-          zIndex: 10,
+          zIndex: 1000,
+          pointerEvents: "auto",
         }}
       >
         ⚙️ Config
@@ -192,6 +311,46 @@ export const GlWorkshop: FC = () => {
             overflowY: "auto",
           }}>
             <h2 style={{ margin: "0 0 20px 0", color: "#FFB018" }}>Animation Configuration</h2>
+
+            {/* Animation Type Selection */}
+            <div style={{ marginBottom: "20px", padding: "15px", backgroundColor: "#333", borderRadius: "8px" }}>
+              <h3 style={{ margin: "0 0 10px 0", color: "#FFB018" }}>Animation Type</h3>
+              <div style={{ display: "flex", gap: "10px" }}>
+                <button
+                  onClick={() => handleAnimationTypeChange('bonus')}
+                  style={{
+                    padding: "8px 16px",
+                    fontSize: "12px",
+                    fontWeight: "bold",
+                    backgroundColor: animationType === 'bonus' ? "#d80000" : "#555",
+                    color: "#fff",
+                    border: "none",
+                    borderRadius: "6px",
+                    cursor: "pointer",
+                  }}
+                >
+                  🎯 Bonus Round
+                </button>
+                <button
+                  onClick={() => handleAnimationTypeChange('jackpot')}
+                  style={{
+                    padding: "8px 16px",
+                    fontSize: "12px",
+                    fontWeight: "bold",
+                    backgroundColor: animationType === 'jackpot' ? "#fa883b" : "#555",
+                    color: "#fff",
+                    border: "none",
+                    borderRadius: "6px",
+                    cursor: "pointer",
+                  }}
+                >
+                  🏆 Jackpot Round
+                </button>
+              </div>
+              <p style={{ fontSize: "12px", color: "#ccc", margin: "10px 0 0 0" }}>
+                Current: {animationType === 'bonus' ? 'Bonus Round (Red/Green/Magenta/Blue)' : 'Jackpot Round (Gold/Brown)'}
+              </p>
+            </div>
 
             <div style={{ marginBottom: "15px" }}>
               <label title="Number of particles in the explosion (more = denser effect)" style={{ display: "block", marginBottom: "5px" }}>Particle Count:</label>
