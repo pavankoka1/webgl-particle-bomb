@@ -8,8 +8,8 @@ import Parent from "./components/cloned-component/Parent";
 function App() {
     return (
         <div className="App">
-            {/* <GlWorkshop /> */}
-            <Parent />
+            <GlWorkshop />
+            {/* <Parent /> */}
         </div>
     );
 }
