@@ -120,6 +120,8 @@ export const FragmentShaderSource = `
   uniform vec3 u_viewPosition;
   uniform float u_metallic;
   uniform float u_roughness;
+  // Toggle lighting calculations (1.0 = on, 0.0 = off)
+  uniform float u_useLighting;
   
   varying vec3 v_normal;
   varying vec3 v_position;
@@ -167,6 +169,16 @@ export const FragmentShaderSource = `
     vec3 normal = normalize(v_normal);
     vec3 viewDir = normalize(u_viewPosition - v_position);
     vec3 lightDir = normalize(u_lightPosition - v_position);
+
+    // If lighting is disabled, output flat colour and exit early
+    if (u_useLighting < 0.5) {
+      // Simple gamma-corrected colour
+      vec3 color = baseColor;
+      color = color / (color + vec3(1.0));
+      color = pow(color, vec3(1.0 / 2.2));
+      gl_FragColor = vec4(color, u_color.a);
+      return;
+    }
     
     // Metallic properties
     float metallic = u_metallic;

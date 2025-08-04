@@ -62,6 +62,8 @@ export interface ExplosionConfig {
   colorPalette?: [number, number, number, number][];
   windStrength?: number;
   windDirection?: number;
+  // Percentage (0-1) of particles that should fade-in during explosion (opacity 0->1)
+  fadeInPercentage?: number;
   mode?: AnimationMode;
 }
 
@@ -98,6 +100,10 @@ export class GlRenderer {
   private depthBUniformLocation: WebGLUniformLocation | null = null;
   private depthScaleUniformLocation: WebGLUniformLocation | null = null;
   private zPositionUniformLocation: WebGLUniformLocation | null = null;
+  private useLightingUniformLocation: WebGLUniformLocation | null = null;
+
+  // Lighting toggle (true = lighting on)
+  private useLighting: boolean = true;
 
   // Animation properties
   private animationId: number | null = null;
@@ -134,6 +140,7 @@ export class GlRenderer {
     goldColor: [1.0, 0.8, 0.2, 1.0], // #FFCC33
     windStrength: 0.0, // No wind by default
     windDirection: 0.0, // Wind direction in radians
+    fadeInPercentage: 1,
   };
 
   constructor(gl: WebGLRenderingContext) {
@@ -269,6 +276,9 @@ export class GlRenderer {
     this.viewPosition = [0, 0, mergedConfig.cameraDistance ?? 10000];
     this.lightPosition = [0, 0, (mergedConfig.cameraDistance ?? 10000) * 0.8];
 
+    // Enable lighting only for jackpot mode
+    this.useLighting = mergedConfig.mode === 'jackpot';
+
     const canvasWidth = this.gl.canvas.width;
     const canvasHeight = this.gl.canvas.height;
 
@@ -356,13 +366,15 @@ export class GlRenderer {
       const rotationSpeedY = (Math.random() - 0.5) * 0.26;
       const rotationSpeedZ = (Math.random() - 0.5) * 0.56;
       const color: [number, number, number, number] = colorPalette[Math.floor(Math.random() * colorPalette.length)];
-      const metallic = mergedConfig.metallic;
-      const roughness = mergedConfig.roughness;
+      const metallic = mergedConfig.mode === 'jackpot' ? (mergedConfig.metallic ?? 0.8) : 0.0;
+      const roughness = mergedConfig.mode === 'jackpot' ? (mergedConfig.roughness ?? 0.2) : 1.0;
       const depthA = 80.0 + Math.random() * 160.0;
       const depthB = 70.0 + Math.random() * 140.0;
       const depthScale = 0.04 + Math.random() * 0.12;
       const fallSpeed = particleType === 'leaf' ? (mergedConfig.fallSpeed ?? 0.6) * 0.4 : (mergedConfig.fallSpeed ?? 0.6); // Much slower for leaves
       const life = particleType === 'fade' ? 1000 + Math.random() * 600 : 2000 + Math.random() * 1000; // Longer life
+      // Decide if this particle will fade-in during explosion
+      const fadeInExplosion = Math.random() < (mergedConfig.fadeInPercentage ?? 0.5);
 
       // Bezier curve control points for settling
       const p0 = { x: explosionCenterX, y: explosionCenterY, z: 0 };
@@ -407,7 +419,8 @@ export class GlRenderer {
           approachSpeed,
           explosionScatter,
           mergedConfig.windStrength ?? 0.0,
-          mergedConfig.windDirection ?? 0.0
+          mergedConfig.windDirection ?? 0.0,
+          fadeInExplosion
         )
       );
     }
@@ -512,6 +525,10 @@ export class GlRenderer {
     this.zPositionUniformLocation = this.gl.getUniformLocation(
       this.program,
       "u_zPosition"
+    );
+    this.useLightingUniformLocation = this.gl.getUniformLocation(
+      this.program,
+      "u_useLighting"
     );
 
     // Create a buffer for circle vertices
@@ -631,6 +648,9 @@ export class GlRenderer {
     if (this.zPositionUniformLocation) {
       this.gl.uniform1f(this.zPositionUniformLocation, 0.0); // Initialize Z position
     }
+    if (this.useLightingUniformLocation) {
+      this.gl.uniform1f(this.useLightingUniformLocation, this.useLighting ? 1.0 : 0.0);
+    }
   }
 
   private updatePosition() {
@@ -668,6 +688,9 @@ export class GlRenderer {
     }
     if (this.viewPositionUniformLocation) {
       this.gl.uniform3f(this.viewPositionUniformLocation, ...this.viewPosition);
+    }
+    if (this.useLightingUniformLocation) {
+      this.gl.uniform1f(this.useLightingUniformLocation, this.useLighting ? 1.0 : 0.0);
     }
 
     // Draw each particle

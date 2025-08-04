@@ -59,6 +59,8 @@ export class Particle {
   // Animation properties
   r: number = 0;
   sy: number = 1;
+  // If true, particle starts transparent and fades in during explosion phase
+  fadeInExplosion: boolean = false;
   complete: boolean = false;
 
   p0?: { x: number; y: number; z: number };
@@ -101,7 +103,8 @@ export class Particle {
     approachSpeed: number = 0,
     explosionScatter: { x: number; y: number; z: number } | null = null,
     windStrength: number = 0.0,
-    windDirection: number = 0.0
+    windDirection: number = 0.0,
+    fadeInExplosion: boolean = false
   ) {
     this.centerX = centerX;
     this.centerY = centerY;
@@ -135,6 +138,7 @@ export class Particle {
     this.swingPhase = swingPhase;
     this.windStrength = windStrength;
     this.windDirection = windDirection;
+    this.fadeInExplosion = fadeInExplosion;
 
     // Calculate explosion velocities from Bezier points
     if (p0 && p1 && p2 && p3) {
@@ -316,6 +320,21 @@ export class Particle {
   }
 
   getAlpha(): number {
+    // Handle fade-in during explosion phase
+    if (this.fadeInExplosion) {
+      if (this.phase === 'approach') {
+        return 0.0; // fully transparent until explosion starts
+      }
+      if (this.phase === 'explosion') {
+        // Use a minimum visible fade duration of 0.3 s so the effect is noticeable even if the explosion itself is very short
+        const fadeDuration = Math.max(this.explosionDuration, 0.3);
+        const progress = Math.min(1, this.phaseTime / fadeDuration);
+        console.log('💥 Particle fade-in progress:', progress, fadeDuration);
+        return progress; // 0 -> 1 during explosion
+      }
+      // After explosion, fully opaque
+    }
+
     // For fade particles, fade out during settling phase
     if (this.particleType === 'fade' && this.phase === 'settling') {
       const fadeProgress = this.settlingTime / this.settlingDuration;
