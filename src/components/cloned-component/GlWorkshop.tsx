@@ -1,6 +1,7 @@
 import type { FC } from "react";
 import { useEffect, useRef, useState } from "react";
 import { GlRenderer, ExplosionConfig, AnimationMode } from "./GlRenderer";
+import { CHAIN_EXPLOSION_STEPS, ExplosionStep } from "./explosionSteps";
 import { ConfigModal } from "./ConfigModal";
 
 // iPhone 14 Pro Max aspect ratio (width:height = 1290:2796 ≈ 0.461)
@@ -19,10 +20,13 @@ export const GlWorkshop: FC = () => {
   const [displayMode, setDisplayMode] = useState<DisplayMode>('web');
   const [mobileDimensions, setMobileDimensions] = useState({ width: 0, height: 0 });
 
+  // Allow runtime editing of chain steps
+  const [explosionSteps, setExplosionSteps] = useState<ExplosionStep[]>(CHAIN_EXPLOSION_STEPS);
+
   const [config, setConfig] = useState<ExplosionConfig>({
     particleCount: 600, // More particles for better bomb effect
     explosionDuration: 0.03, // Much faster explosion (30ms)
-    explosionForce: 12000, // Much stronger force for dramatic bomb effect
+    explosionForce: 5000, // Much stronger force for dramatic bomb effect
     particleRadiusMin: 2,
     particleRadiusMax: 12,
     settlingDuration: 6, // Longer settling for more dramatic effect
@@ -87,17 +91,12 @@ export const GlWorkshop: FC = () => {
     setRenderer(glRenderer);
     glRenderer.start();
 
-    // Trigger bomb explosion after a short delay (only once)
+    // Trigger a chain reaction of explosions (only once)
     if (!explosionTriggered.current) {
-      console.log('🔄 Setting up initial explosion...');
-      setTimeout(() => {
-        console.log('💥 Triggering initial explosion at:', new Date().toISOString());
-        console.log('📊 Config values:', { centerX: config.centerX, centerY: config.centerY });
-        console.log('📐 Canvas dimensions:', canvas.width, 'x', canvas.height);
-        console.log('🔍 DEBUG: Config being passed to triggerBombExplosion:', JSON.stringify({ mode: animationType, ...config }, null, 2));
-        glRenderer.triggerBombExplosion(undefined, undefined, { mode: animationType, ...config });
-        explosionTriggered.current = true;
-      }, 1000); // Increased delay to ensure canvas is properly sized
+      console.log('🔄 Setting up chain explosion sequence...');
+      // Kick off explosion sequence as soon as renderer ready
+      setTimeout(() => runChainExplosions(glRenderer), 300);
+      explosionTriggered.current = true;
     }
 
     // Cleanup
@@ -124,6 +123,7 @@ export const GlWorkshop: FC = () => {
     }
     if (renderer) {
       renderer.resize();
+      runChainExplosions(renderer)
     }
   }, [displayMode, renderer]);
 
@@ -137,11 +137,35 @@ export const GlWorkshop: FC = () => {
     }
   };
 
+  // Use predefined steps from constants to ensure consistent visuals
+  const runChainExplosions = (targetRenderer: GlRenderer) => {
+    explosionSteps.forEach(step => {
+      setTimeout(() => {
+        console.log(
+          `💥 Chain burst at (${step.centerX}, ${step.centerY}) | particles: ${step.particleCount}`
+        );
+        targetRenderer.triggerBombExplosion(undefined, undefined, {
+          ...config,
+          mode: animationType,
+          centerX: step.centerX,
+          centerY: step.centerY,
+          particleCount: step.particleCount,
+          explosionDuration: step.explosionDuration,
+          explosionForce: step.explosionForce,
+          clearExisting: step.clearExisting,
+          // Chain explosions use subtle lighting for better readability
+          useLighting: false,
+          metallic: 0.05,
+          roughness: 1.0,
+        });
+      }, step.delay);
+    });
+  };
+
   const handleReplay = () => {
     if (renderer) {
-      console.log('🔄 Replaying animation with config:', config);
-      console.log('📊 Config values:', { centerX: config.centerX, centerY: config.centerY });
-      renderer.triggerBombExplosion(undefined, undefined, { mode: animationType, ...config });
+      console.log('🔄 Replaying chain reaction');
+      runChainExplosions(renderer);
     }
   };
 
@@ -149,7 +173,7 @@ export const GlWorkshop: FC = () => {
     setShowConfig(false);
     if (renderer) {
       console.log('⚙️ Applying new config:', config);
-      console.log('📊 Config values:', { centerX: config.centerX, centerY: config.centerY });
+      console.log(' Config values:', { centerX: config.centerX, centerY: config.centerY });
       renderer.triggerBombExplosion(undefined, undefined, { mode: animationType, ...config });
     }
   };
@@ -314,6 +338,8 @@ export const GlWorkshop: FC = () => {
           config={config}
           setConfig={setConfig}
           animationType={animationType}
+          explosionSteps={explosionSteps}
+          setExplosionSteps={setExplosionSteps}
           onAnimationTypeChange={handleAnimationTypeChange}
           onApply={handleApplyConfig}
           onClose={() => setShowConfig(false)}

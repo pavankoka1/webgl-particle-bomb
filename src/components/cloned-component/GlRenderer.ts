@@ -65,6 +65,16 @@ export interface ExplosionConfig {
   // Percentage (0-1) of particles that should fade-in during explosion (opacity 0->1)
   fadeInPercentage?: number;
   mode?: AnimationMode;
+  /**
+   * Force using lighting calculations irrespective of animation mode.
+   * If undefined, lighting defaults to `mode === 'jackpot'` for backward compatibility.
+   */
+  useLighting?: boolean;
+  /**
+   * Whether to clear existing particles before spawning a new explosion.
+   * Defaults to true to maintain previous behaviour.
+   */
+  clearExisting?: boolean;
 }
 
 export class GlRenderer {
@@ -268,16 +278,23 @@ export class GlRenderer {
       }
     });
 
-    // Clear existing particles
-    this.particles = [];
-    console.log('🧹 Cleared existing particles');
+    // Clear existing particles only if requested (default = true)
+    if (mergedConfig.clearExisting !== false) {
+      this.particles = [];
+      console.log('🧹 Cleared existing particles');
+    }
 
     // Update camera and lighting positions based on config
     this.viewPosition = [0, 0, mergedConfig.cameraDistance ?? 10000];
     this.lightPosition = [0, 0, (mergedConfig.cameraDistance ?? 10000) * 0.8];
 
-    // Enable lighting only for jackpot mode
-    this.useLighting = mergedConfig.mode === 'jackpot';
+    // Determine lighting usage
+    if (typeof mergedConfig.useLighting === 'boolean') {
+      this.useLighting = mergedConfig.useLighting;
+    } else {
+      // Fallback to original behaviour
+      this.useLighting = mergedConfig.mode === 'jackpot';
+    }
 
     const canvasWidth = this.gl.canvas.width;
     const canvasHeight = this.gl.canvas.height;
