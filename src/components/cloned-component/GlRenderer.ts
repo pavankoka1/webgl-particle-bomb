@@ -343,8 +343,8 @@ export class GlRenderer {
       let explosionDirZ = (targetZ - 0) / (mergedConfig.zScatter ?? 2000);
 
       // For 10% of particles, reduce x/y and boost z direction for a more z-axis explosion
-      explosionDirX *= Math.random() * 0.4;
-      explosionDirY *= Math.random() * 0.4;
+      explosionDirX *= Math.random() * 1;
+      explosionDirY *= Math.random() * 1;
       explosionDirZ *= Math.random() * 50;
 
       const explosionScatter = {

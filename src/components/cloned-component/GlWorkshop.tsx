@@ -17,7 +17,7 @@ export const GlWorkshop: FC = () => {
   const [renderer, setRenderer] = useState<GlRenderer | null>(null);
   const explosionTriggered = useRef(false);
   const [showConfig, setShowConfig] = useState(false);
-  const [animationType, setAnimationType] = useState<AnimationType>('bonus');
+  const [animationType, setAnimationType] = useState<AnimationType>('jackpot');
   const [displayMode, setDisplayMode] = useState<DisplayMode>('web');
   const [sequenceType, setSequenceType] = useState<SequenceType>('chain');
   const [mobileDimensions, setMobileDimensions] = useState({ width: 0, height: 0 });
@@ -50,6 +50,7 @@ export const GlWorkshop: FC = () => {
     windStrength: 0.0, // No wind by default
     windDirection: 0.0, // Wind direction in radians
     fadeInPercentage: 1,
+    useLighting: true,
   });
 
 
@@ -155,7 +156,7 @@ export const GlWorkshop: FC = () => {
           explosionDuration: step.explosionDuration,
           explosionForce: step.explosionForce,
           clearExisting: step.clearExisting,
-          useLighting: config.useLighting ?? false,
+          useLighting: config.useLighting ?? true,
           metallic: config.metallic,
           roughness: config.roughness,
         });
