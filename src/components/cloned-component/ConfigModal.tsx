@@ -3,12 +3,16 @@ import { ExplosionConfig } from "./GlRenderer";
 import { AnimationMode } from "./GlRenderer";
 import { ExplosionStep } from "./explosionSteps";
 
+type SequenceType = 'single' | 'chain';
+
 interface ConfigModalProps {
     config: ExplosionConfig;
     setConfig: React.Dispatch<React.SetStateAction<ExplosionConfig>>;
     animationType: AnimationMode;
     explosionSteps: ExplosionStep[];
     setExplosionSteps: React.Dispatch<React.SetStateAction<ExplosionStep[]>>;
+    sequenceType: SequenceType;
+    setSequenceType: React.Dispatch<React.SetStateAction<SequenceType>>;
     onAnimationTypeChange: (mode: AnimationMode) => void;
     onApply: () => void;
     onClose: () => void;
@@ -20,10 +24,25 @@ export const ConfigModal: FC<ConfigModalProps> = ({
     animationType,
     explosionSteps,
     setExplosionSteps,
+    sequenceType,
+    setSequenceType,
     onAnimationTypeChange,
     onApply,
     onClose,
 }) => {
+
+    // Helper to update explosion step
+    const updateStep = (index: number, field: keyof ExplosionStep, value: number | boolean) => {
+        setExplosionSteps(prev => prev.map((s, i) => i === index ? { ...s, [field]: value } : s));
+    };
+
+    const addNewStep = () => {
+        setExplosionSteps(prev => {
+            const lastDelay = prev.length ? prev[prev.length - 1].delay + 300 : 0;
+            return [...prev, { delay: lastDelay, centerX: 0.5, centerY: 0.5, explosionDuration: 0.03, explosionForce: 2000, particleCount: 80 }];
+        });
+    };
+
     return (
         <div style={{
             position: "fixed",
@@ -75,6 +94,15 @@ export const ConfigModal: FC<ConfigModalProps> = ({
                     </div>
                 </div>
 
+                {/* Sequence Type */}
+                <div style={{ marginBottom: 20 }}>
+                    <label style={{ display: "block", marginBottom: 5 }}>Sequence Type:</label>
+                    <select value={sequenceType} onChange={(e) => setSequenceType(e.target.value as SequenceType)} style={{ padding: 8, borderRadius: 6 }}>
+                        <option value="single">Single Blast</option>
+                        <option value="chain">Chain Reaction</option>
+                    </select>
+                </div>
+
                 {/* Fade in percentage */}
                 <div style={{ marginBottom: 15 }}>
                     <label style={{ display: "block", marginBottom: 5 }}>Opacity Fade-In (% of particles):</label>
@@ -87,6 +115,29 @@ export const ConfigModal: FC<ConfigModalProps> = ({
                         style={{ width: "100%" }}
                     />
                     <span style={{ fontSize: 12, color: "#ccc" }}>{Math.round((config.fadeInPercentage ?? 0.5) * 100)}%</span>
+                </div>
+
+                {/* Core Explosion Parameters */}
+                <div style={{ marginBottom: 20 }}>
+                    {[
+                        { key: 'particleCount', label: 'Particle Count', min: 10, max: 1000, step: 10 },
+                        { key: 'explosionDuration', label: 'Explosion Duration (s)', min: 0.01, max: 0.1, step: 0.005 },
+                        { key: 'explosionForce', label: 'Explosion Force', min: 100, max: 12000, step: 100 },
+                        { key: 'particleRadiusMin', label: 'Particle Radius Min', min: 1, max: 20, step: 1 },
+                        { key: 'particleRadiusMax', label: 'Particle Radius Max', min: 2, max: 30, step: 1 },
+                        { key: 'airResistance', label: 'Air Resistance', min: 0.9, max: 1, step: 0.001 },
+                        { key: 'gravity', label: 'Gravity', min: 0, max: 20, step: 0.5 },
+                        { key: 'windStrength', label: 'Wind Strength', min: 0, max: 20, step: 0.5 },
+                        { key: 'windDirection', label: 'Wind Direction (rad)', min: 0, max: 6.283, step: 0.1 },
+                    ].map(meta => (
+                        <div key={meta.key} style={{ marginBottom: 12 }}>
+                            <label style={{ display: 'block', marginBottom: 4 }}>{meta.label}: {(config as any)[meta.key]}</label>
+                            <input type="range" min={meta.min} max={meta.max} step={meta.step}
+                                value={(config as any)[meta.key] ?? meta.min}
+                                onChange={e => setConfig(prev => ({ ...prev, [meta.key]: parseFloat(e.target.value) }))}
+                                style={{ width: '100%' }} />
+                        </div>
+                    ))}
                 </div>
 
                 {/* Lighting & Reflectivity */}
@@ -102,22 +153,39 @@ export const ConfigModal: FC<ConfigModalProps> = ({
                     </div>
                 </div>
 
-                {/* Explosion Steps JSON */}
+                {/* Explosion Steps UI */}
                 <div style={{ marginBottom: 20 }}>
-                    <h3 style={{ margin: 0, marginBottom: 10, color: "#FFB018" }}>Chain Explosion Steps</h3>
-                    <textarea
-                        style={{ width: "100%", height: 120, backgroundColor: "#111", color: "#fff", padding: 8, borderRadius: 6, border: "1px solid #555" }}
-                        value={JSON.stringify(explosionSteps, null, 2)}
-                        onChange={(e) => {
-                            try {
-                                const parsed = JSON.parse(e.target.value);
-                                if (Array.isArray(parsed)) {
-                                    setExplosionSteps(parsed as ExplosionStep[]);
-                                }
-                            } catch { /* ignore parse errors */ }
-                        }}
-                    />
-                    <small style={{ color: "#888" }}>Edit JSON to customize chain reaction.</small>
+                    <h3 style={{ margin: 0, marginBottom: 10, color: "#FFB018" }}>Chain Explosions</h3>
+                    {explosionSteps.map((step, idx) => (
+                        <div key={idx} style={{ border: '1px solid #444', padding: 10, borderRadius: 8, marginBottom: 12 }}>
+                            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+                                <strong>Step {idx + 1}</strong>
+                                <button onClick={() => setExplosionSteps(prev => prev.filter((_, i) => i !== idx))} style={{ background: '#900', color: '#fff', border: 'none', borderRadius: 4, padding: '2px 6px', cursor: 'pointer' }}>✕</button>
+                            </div>
+                            {[
+                                { field: 'delay', label: 'Delay (ms)', min: 0, max: 3000, step: 50 },
+                                { field: 'centerX', label: 'Center X', min: 0, max: 1, step: 0.01 },
+                                { field: 'centerY', label: 'Center Y', min: 0, max: 1, step: 0.01 },
+                                { field: 'explosionDuration', label: 'Duration (s)', min: 0.01, max: 0.1, step: 0.005 },
+                                { field: 'explosionForce', label: 'Force', min: 100, max: 5000, step: 100 },
+                                { field: 'particleCount', label: 'Particles', min: 10, max: 300, step: 10 },
+                            ].map(meta => (
+                                <div key={meta.field} style={{ marginTop: 8 }}>
+                                    <label style={{ display: 'block', marginBottom: 4 }}>{meta.label}: {(step as any)[meta.field]}</label>
+                                    <input type="range" min={meta.min} max={meta.max} step={meta.step}
+                                        value={(step as any)[meta.field] ?? meta.min}
+                                        onChange={e => updateStep(idx, meta.field as any, parseFloat(e.target.value))}
+                                        style={{ width: '100%' }} />
+                                </div>
+                            ))}
+                            <div style={{ marginTop: 8 }}>
+                                <label>
+                                    <input type="checkbox" checked={step.clearExisting ?? false} onChange={e => updateStep(idx, 'clearExisting', e.target.checked)} /> Clear Existing
+                                </label>
+                            </div>
+                        </div>
+                    ))}
+                    <button onClick={addNewStep} style={{ padding: '6px 12px', backgroundColor: '#00796b', color: '#fff', border: 'none', borderRadius: 6, cursor: 'pointer' }}>+ Add Step</button>
                 </div>
 
                 {/* Additional controls could be added here. */}

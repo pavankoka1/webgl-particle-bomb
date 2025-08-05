@@ -8,6 +8,7 @@ import { ConfigModal } from "./ConfigModal";
 const IPHONE_ASPECT_RATIO = 1290 / 2796; // ≈ 0.461
 
 type DisplayMode = 'web' | 'mobile';
+type SequenceType = 'single' | 'chain';
 
 type AnimationType = AnimationMode;
 
@@ -18,6 +19,7 @@ export const GlWorkshop: FC = () => {
   const [showConfig, setShowConfig] = useState(false);
   const [animationType, setAnimationType] = useState<AnimationType>('bonus');
   const [displayMode, setDisplayMode] = useState<DisplayMode>('web');
+  const [sequenceType, setSequenceType] = useState<SequenceType>('chain');
   const [mobileDimensions, setMobileDimensions] = useState({ width: 0, height: 0 });
 
   // Allow runtime editing of chain steps
@@ -94,8 +96,8 @@ export const GlWorkshop: FC = () => {
     // Trigger a chain reaction of explosions (only once)
     if (!explosionTriggered.current) {
       console.log('🔄 Setting up chain explosion sequence...');
-      // Kick off explosion sequence as soon as renderer ready
-      setTimeout(() => runChainExplosions(glRenderer), 300);
+      // Kick off chosen sequence as soon as renderer ready
+      setTimeout(() => triggerInitialSequence(glRenderer), 300);
       explosionTriggered.current = true;
     }
 
@@ -123,7 +125,7 @@ export const GlWorkshop: FC = () => {
     }
     if (renderer) {
       renderer.resize();
-      runChainExplosions(renderer)
+      triggerInitialSequence(renderer)
     }
   }, [displayMode, renderer]);
 
@@ -153,20 +155,26 @@ export const GlWorkshop: FC = () => {
           explosionDuration: step.explosionDuration,
           explosionForce: step.explosionForce,
           clearExisting: step.clearExisting,
-          // Chain explosions use subtle lighting for better readability
-          useLighting: false,
-          metallic: 0.05,
-          roughness: 1.0,
+          useLighting: config.useLighting ?? false,
+          metallic: config.metallic,
+          roughness: config.roughness,
         });
       }, step.delay);
     });
   };
 
-  const handleReplay = () => {
-    if (renderer) {
-      console.log('🔄 Replaying chain reaction');
-      runChainExplosions(renderer);
+  const triggerInitialSequence = (rendererInst: GlRenderer) => {
+    if (sequenceType === 'chain') {
+      runChainExplosions(rendererInst);
+    } else {
+      rendererInst.triggerBombExplosion(undefined, undefined, { mode: animationType, ...config });
     }
+  };
+
+  const handleReplay = () => {
+    if (!renderer) return;
+    console.log('🔄 Replaying animation');
+    triggerInitialSequence(renderer);
   };
 
   const handleApplyConfig = () => {
@@ -285,6 +293,15 @@ export const GlWorkshop: FC = () => {
         >
           {displayMode === 'mobile' ? '📱 Mobile' : '🖥 Web'}
         </button>
+        {/* Sequence Type Dropdown */}
+        <select
+          value={sequenceType}
+          onChange={(e) => setSequenceType(e.target.value as SequenceType)}
+          style={{ padding: "10px", borderRadius: 6 }}
+        >
+          <option value="single">Single Blast</option>
+          <option value="chain">Chain Reaction</option>
+        </select>
       </div>
 
       {/* Replay Button - Bottom Left */}
@@ -340,6 +357,8 @@ export const GlWorkshop: FC = () => {
           animationType={animationType}
           explosionSteps={explosionSteps}
           setExplosionSteps={setExplosionSteps}
+          sequenceType={sequenceType}
+          setSequenceType={setSequenceType}
           onAnimationTypeChange={handleAnimationTypeChange}
           onApply={handleApplyConfig}
           onClose={() => setShowConfig(false)}
