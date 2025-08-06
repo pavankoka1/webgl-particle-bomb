@@ -1,0 +1,736 @@
+import { FragmentShaderSource, VertexShaderSource } from "./shaders";
+ 
+interface Particle {
+  x: number;
+  y: number;
+  z: number;
+  radius: number;
+  shapeType: "hyperbolic" | "circle";
+  a: number;
+  b: number;
+  vx: number;
+  vy: number;
+  vz: number;
+  rotationSpeedX: number;
+  rotationSpeedY: number;
+  rotationSpeedZ: number;
+  burstDelay: number;
+  burstSpeed: number;
+  individualTime: number;
+  color: { r: number; g: number; b: number };
+}
+ 
+export type ConfettiMode = "jackpot" | "bonus";
+ 
+export class ConfettiRenderer {
+  private program: WebGLProgram | null = null;
+  private positionBuffer: WebGLBuffer | null = null;
+  private normalBuffer: WebGLBuffer | null = null;
+  private texCoordBuffer: WebGLBuffer | null = null;
+  private animationId: number | null = null;
+  private startTime: number = 0;
+  private gl: WebGLRenderingContext;
+  private particles: Particle[] = [];
+  private burstCenter: { x: number; y: number; z: number };
+  private mode: ConfettiMode;
+ 
+  constructor(
+    gl: WebGLRenderingContext,
+    burstCenter?: { x: number; y: number; z: number },
+    mode: ConfettiMode = "jackpot"
+  ) {
+    this.gl = gl;
+    this.burstCenter = burstCenter || { x: 0, y: 0, z: 0 }; // Default to center if not provided
+    this.mode = mode;
+    this.init();
+  }
+ 
+  private init() {
+    // Create and compile shaders
+    const vertexShader = this.createShader(
+      this.gl.VERTEX_SHADER,
+      VertexShaderSource
+    );
+    const fragmentShader = this.createShader(
+      this.gl.FRAGMENT_SHADER,
+      FragmentShaderSource
+    );
+ 
+    if (!vertexShader || !fragmentShader) return;
+ 
+    // Create program
+    this.program = this.gl.createProgram();
+    if (!this.program) return;
+ 
+    this.gl.attachShader(this.program, vertexShader);
+    this.gl.attachShader(this.program, fragmentShader);
+    this.gl.linkProgram(this.program);
+ 
+    if (!this.gl.getProgramParameter(this.program, this.gl.LINK_STATUS)) {
+      console.error(
+        "Program link error:",
+        this.gl.getProgramInfoLog(this.program)
+      );
+      return;
+    }
+ 
+    // Generate multiple particles with different shapes
+    this.generateParticles();
+ 
+    // Enable depth testing
+    this.gl.enable(this.gl.DEPTH_TEST);
+    this.gl.depthFunc(this.gl.LEQUAL);
+ 
+    this.startTime = performance.now();
+  }
+ 
+  private createShader(type: number, source: string): WebGLShader | null {
+    const shader = this.gl.createShader(type);
+    if (!shader) return null;
+ 
+    this.gl.shaderSource(shader, source);
+    this.gl.compileShader(shader);
+ 
+    if (!this.gl.getShaderParameter(shader, this.gl.COMPILE_STATUS)) {
+      console.error("Shader compile error:", this.gl.getShaderInfoLog(shader));
+      this.gl.deleteShader(shader);
+      return null;
+    }
+ 
+    return shader;
+  }
+ 
+  private generateParticles() {
+    // Generate 300 particles for a burst effect
+    for (let i = 0; i < 300; i++) {
+      // Create a proper burst pattern - all particles start at the same time
+      const burstAngle = Math.random() * Math.PI * 2; // Random angle around the sphere
+      const burstElevation = (Math.random() - 0.5) * Math.PI; // Random elevation (-π/2 to π/2)
+      const individualSpeed = 2.0 + Math.random() * 6.0; // Higher speed for burst effect (2 to 8)
+ 
+      // All particles burst at the same time (no delay)
+      const burstDelay = 0.0; // Remove random delays for burst effect
+ 
+      // Convert to 3D velocity for burst pattern
+      const vx =
+        individualSpeed * Math.cos(burstElevation) * Math.cos(burstAngle);
+      const vy =
+        individualSpeed * Math.cos(burstElevation) * Math.sin(burstAngle);
+      const vz = individualSpeed * Math.sin(burstElevation);
+ 
+      const particle: Particle = {
+        x: this.burstCenter.x, // All particles start from configured burst center
+        y: this.burstCenter.y,
+        z: this.burstCenter.z,
+        radius: 0.015 + Math.random() * 0.02, // Smaller radius (0.015 to 0.035)
+        shapeType: this.getRandomShapeType(),
+        a: 1.5 + Math.random() * 1.0,
+        b: 1.5 + Math.random() * 1.0,
+        vx: vx,
+        vy: vy,
+        vz: vz,
+        rotationSpeedX: (Math.random() - 0.5) * 8, // Much more varied rotation
+        rotationSpeedY: (Math.random() - 0.5) * 8,
+        rotationSpeedZ: (Math.random() - 0.5) * 8,
+        burstDelay: burstDelay, // All particles burst immediately
+        burstSpeed: individualSpeed,
+        individualTime: 0,
+        color: this.getRandomColor(),
+      };
+      this.particles.push(particle);
+    }
+  }
+ 
+  private getRandomShapeType(): "hyperbolic" | "circle" {
+    const rand = Math.random();
+    if (rand < 0.5) return "hyperbolic";
+    return "circle";
+  }
+ 
+  private getRandomColor(): { r: number; g: number; b: number } {
+    if (this.mode === "jackpot") {
+      // Gold colors for jackpot mode
+      const goldColors = [
+        { r: 0.796, g: 0.557, b: 0.243 }, // #cb8e3e - Darker gold
+        { r: 0.941, g: 0.871, b: 0.533 }, // #f0de88 - Lighter gold
+      ];
+      return goldColors[Math.floor(Math.random() * goldColors.length)];
+    } else {
+      // Bonus mode: red, lime green, magenta, blue
+      const colors = [
+        { r: 0.847, g: 0.0, b: 0.0 }, // #d80000 - Red
+        { r: 0.796, g: 0.859, b: 0.243 }, // #cbdb3e - Lime Green
+        { r: 0.886, g: 0.361, b: 0.945 }, // #e25cf1 - Magenta
+        { r: 0.149, g: 0.392, b: 0.58 }, // #266494 - Blue
+      ];
+      return colors[Math.floor(Math.random() * colors.length)];
+    }
+  }
+ 
+  private generateParticleGeometry(particle: Particle) {
+    const resolution = 30; // Reduced resolution for smaller particles
+    const vertices: number[] = [];
+    const normals: number[] = [];
+    const texCoords: number[] = [];
+    const indices: number[] = [];
+ 
+    // Generate vertices based on particle shape type
+    for (let i = 0; i <= resolution; i++) {
+      for (let j = 0; j <= resolution; j++) {
+        // Convert to polar coordinates for circular shape
+        const r = (i / resolution) * particle.radius;
+        const theta = (j / resolution) * 2 * Math.PI;
+ 
+        // Convert back to cartesian coordinates
+        const x = r * Math.cos(theta);
+        const y = r * Math.sin(theta);
+ 
+        // Apply different z formulas based on shape type
+        let z = 0;
+        if (particle.shapeType === "hyperbolic") {
+          // Make hyperbolic shapes extremely pronounced for tiny particles
+          z =
+            ((x * x) / (particle.a * particle.a) -
+              (y * y) / (particle.b * particle.b)) *
+            15.0;
+        }
+        // 'circle' type has z = 0 (flat circle)
+ 
+        vertices.push(x, y, z);
+ 
+        // Calculate normal vector
+        let nx = 0,
+          ny = 0,
+          nz = 1;
+        if (particle.shapeType === "hyperbolic") {
+          // Normal for hyperbolic paraboloid with extreme scaling for tiny particles
+          nx = (-(2 * x) / (particle.a * particle.a)) * 15.0;
+          ny = (-(-2 * y) / (particle.b * particle.b)) * 15.0;
+        }
+        const length = Math.sqrt(nx * nx + ny * ny + nz * nz);
+        normals.push(nx / length, ny / length, nz / length);
+ 
+        texCoords.push(i / resolution, j / resolution);
+      }
+    }
+ 
+    // Generate indices for triangles
+    for (let i = 0; i < resolution; i++) {
+      for (let j = 0; j < resolution; j++) {
+        const current = i * (resolution + 1) + j;
+        const next = i * (resolution + 1) + ((j + 1) % (resolution + 1));
+        const currentInner = (i + 1) * (resolution + 1) + j;
+        const nextInner =
+          (i + 1) * (resolution + 1) + ((j + 1) % (resolution + 1));
+ 
+        indices.push(current, currentInner, next);
+        indices.push(next, currentInner, nextInner);
+      }
+    }
+ 
+    return { vertices, normals, texCoords, indices };
+  }
+ 
+  private updateParticlePhysics(time: number) {
+    const gravity = 1.5; // Gravity effect
+    const drag = 0.99; // Air resistance (slightly less drag for more movement)
+ 
+    for (const particle of this.particles) {
+      // Update individual particle time
+      particle.individualTime += 0.016; // Assuming 60fps
+ 
+      // Only move particles after their burst delay
+      if (particle.individualTime >= particle.burstDelay) {
+        // Individual particle physics (tsParticles style)
+        // Each particle has its own gravity and drag characteristics
+        const individualGravity = gravity + (Math.random() - 0.5) * 0.5; // Slight gravity variation
+        const individualDrag = drag + (Math.random() - 0.5) * 0.02; // Slight drag variation
+ 
+        // Update velocity with individual physics
+        particle.vy -= individualGravity * 0.016;
+        particle.vx *= individualDrag;
+        particle.vy *= individualDrag;
+        particle.vz *= individualDrag;
+ 
+        // Add individual turbulence (tsParticles style)
+        const turbulence = 0.02;
+        particle.vx += (Math.random() - 0.5) * turbulence;
+        particle.vy += (Math.random() - 0.5) * turbulence;
+        particle.vz += (Math.random() - 0.5) * turbulence;
+ 
+        // Update position
+        particle.x += particle.vx * 0.016;
+        particle.y += particle.vy * 0.016;
+        particle.z += particle.vz * 0.016;
+ 
+        // Individual boundary handling
+        if (Math.abs(particle.x) > 12) {
+          particle.vx *= -0.7;
+          particle.x = Math.sign(particle.x) * 12;
+        }
+        if (Math.abs(particle.y) > 12) {
+          particle.vy *= -0.7;
+          particle.y = Math.sign(particle.y) * 12;
+        }
+        if (Math.abs(particle.z) > 6) {
+          particle.vz *= -0.7;
+          particle.z = Math.sign(particle.z) * 6;
+        }
+      }
+    }
+  }
+ 
+  private createMatrix4(): number[] {
+    return new Array(16).fill(0);
+  }
+ 
+  private identityMatrix(): number[] {
+    const matrix = this.createMatrix4();
+    matrix[0] = 1;
+    matrix[5] = 1;
+    matrix[10] = 1;
+    matrix[15] = 1;
+    return matrix;
+  }
+ 
+  private multiplyMatrices(a: number[], b: number[]): number[] {
+    const result = this.createMatrix4();
+    for (let i = 0; i < 4; i++) {
+      for (let j = 0; j < 4; j++) {
+        result[i * 4 + j] =
+          a[i * 4 + 0] * b[0 * 4 + j] +
+          a[i * 4 + 1] * b[1 * 4 + j] +
+          a[i * 4 + 2] * b[2 * 4 + j] +
+          a[i * 4 + 3] * b[3 * 4 + j];
+      }
+    }
+    return result;
+  }
+ 
+  private perspectiveMatrix(
+    fov: number,
+    aspect: number,
+    near: number,
+    far: number
+  ): number[] {
+    const matrix = this.createMatrix4();
+    const f = Math.tan(Math.PI * 0.5 - 0.5 * fov);
+    const rangeInv = 1.0 / (near - far);
+ 
+    matrix[0] = f / aspect;
+    matrix[5] = f;
+    matrix[10] = (near + far) * rangeInv;
+    matrix[11] = -1;
+    matrix[14] = near * far * rangeInv * 2;
+ 
+    return matrix;
+  }
+ 
+  private lookAtMatrix(
+    eye: number[],
+    target: number[],
+    up: number[]
+  ): number[] {
+    const matrix = this.createMatrix4();
+ 
+    const z = [eye[0] - target[0], eye[1] - target[1], eye[2] - target[2]];
+    const zLength = Math.sqrt(z[0] * z[0] + z[1] * z[1] + z[2] * z[2]);
+    z[0] /= zLength;
+    z[1] /= zLength;
+    z[2] /= zLength;
+ 
+    const x = [
+      up[1] * z[2] - up[2] * z[1],
+      up[2] * z[0] - up[0] * z[2],
+      up[0] * z[1] - up[1] * z[0],
+    ];
+    const xLength = Math.sqrt(x[0] * x[0] + x[1] * x[1] + x[2] * x[2]);
+    x[0] /= xLength;
+    x[1] /= xLength;
+    x[2] /= xLength;
+ 
+    const y = [
+      z[1] * x[2] - z[2] * x[1],
+      z[2] * x[0] - z[0] * x[2],
+      z[0] * x[1] - z[1] * x[0],
+    ];
+ 
+    matrix[0] = x[0];
+    matrix[1] = y[0];
+    matrix[2] = z[0];
+    matrix[3] = 0;
+    matrix[4] = x[1];
+    matrix[5] = y[1];
+    matrix[6] = z[1];
+    matrix[7] = 0;
+    matrix[8] = x[2];
+    matrix[9] = y[2];
+    matrix[10] = z[2];
+    matrix[11] = 0;
+    matrix[12] = -(x[0] * eye[0] + x[1] * eye[1] + x[2] * eye[2]);
+    matrix[13] = -(y[0] * eye[0] + y[1] * eye[1] + y[2] * eye[2]);
+    matrix[14] = -(z[0] * eye[0] + z[1] * eye[1] + z[2] * eye[2]);
+    matrix[15] = 1;
+ 
+    return matrix;
+  }
+ 
+  start() {
+    this.render();
+  }
+ 
+  private render = () => {
+    if (!this.program) return;
+ 
+    const currentTime = performance.now();
+    const time = (currentTime - this.startTime) * 0.001; // Convert to seconds
+ 
+    // Update particle physics
+    this.updateParticlePhysics(time);
+ 
+    // Clear canvas
+    this.gl.clearColor(0, 0, 0, 1.0);
+    this.gl.clear(this.gl.COLOR_BUFFER_BIT | this.gl.DEPTH_BUFFER_BIT);
+ 
+    // Use shader program
+    this.gl.useProgram(this.program);
+ 
+    // Set up viewport
+    this.gl.viewport(0, 0, this.gl.canvas.width, this.gl.canvas.height);
+ 
+    // Set up matrices
+    const aspect = this.gl.canvas.width / this.gl.canvas.height;
+    const projectionMatrix = this.perspectiveMatrix(
+      (45 * Math.PI) / 180,
+      aspect,
+      0.1,
+      100
+    );
+    const viewMatrix = this.lookAtMatrix([0, 0, 8], [0, 0, 0], [0, 1, 0]);
+ 
+    // Set uniforms
+    const projectionLocation = this.gl.getUniformLocation(
+      this.program,
+      "u_projectionMatrix"
+    );
+    const modelViewLocation = this.gl.getUniformLocation(
+      this.program,
+      "u_modelViewMatrix"
+    );
+    const normalMatrixLocation = this.gl.getUniformLocation(
+      this.program,
+      "u_normalMatrix"
+    );
+    const timeLocation = this.gl.getUniformLocation(this.program, "u_time");
+    const lightPositionLocation = this.gl.getUniformLocation(
+      this.program,
+      "u_lightPosition"
+    );
+    const viewPositionLocation = this.gl.getUniformLocation(
+      this.program,
+      "u_viewPosition"
+    );
+    const lightColorLocation = this.gl.getUniformLocation(
+      this.program,
+      "u_lightColor"
+    );
+    const objectColorLocation = this.gl.getUniformLocation(
+      this.program,
+      "u_objectColor"
+    );
+    const rotationSpeedsLocation = this.gl.getUniformLocation(
+      this.program,
+      "u_rotationSpeeds"
+    );
+    const modeLocation = this.gl.getUniformLocation(this.program, "u_mode");
+ 
+    if (
+      projectionLocation &&
+      modelViewLocation &&
+      normalMatrixLocation &&
+      timeLocation &&
+      lightPositionLocation &&
+      viewPositionLocation &&
+      lightColorLocation &&
+      objectColorLocation &&
+      rotationSpeedsLocation &&
+      modeLocation
+    ) {
+      this.gl.uniformMatrix4fv(projectionLocation, false, projectionMatrix);
+      this.gl.uniformMatrix4fv(modelViewLocation, false, viewMatrix);
+      this.gl.uniformMatrix4fv(normalMatrixLocation, false, viewMatrix);
+      this.gl.uniform1f(timeLocation, time);
+      this.gl.uniform3f(lightPositionLocation, 6, 6, 6);
+      this.gl.uniform3f(viewPositionLocation, 0, 0, 8);
+      this.gl.uniform3f(lightColorLocation, 1.4, 1.2, 0.8);
+      this.gl.uniform3f(objectColorLocation, 0.796, 0.557, 0.243);
+      this.gl.uniform1f(modeLocation, this.mode === "jackpot" ? 0 : 1);
+    }
+ 
+    // Set up attributes
+    const positionLocation = this.gl.getAttribLocation(
+      this.program,
+      "a_position"
+    );
+    const normalLocation = this.gl.getAttribLocation(this.program, "a_normal");
+    const texCoordLocation = this.gl.getAttribLocation(
+      this.program,
+      "a_texCoord"
+    );
+ 
+    // Position attribute
+    this.gl.bindBuffer(this.gl.ARRAY_BUFFER, this.positionBuffer);
+    this.gl.enableVertexAttribArray(positionLocation);
+    this.gl.vertexAttribPointer(
+      positionLocation,
+      3,
+      this.gl.FLOAT,
+      false,
+      0,
+      0
+    );
+ 
+    // Normal attribute
+    this.gl.bindBuffer(this.gl.ARRAY_BUFFER, this.normalBuffer);
+    this.gl.enableVertexAttribArray(normalLocation);
+    this.gl.vertexAttribPointer(normalLocation, 3, this.gl.FLOAT, false, 0, 0);
+ 
+    // Texture coordinate attribute
+    this.gl.bindBuffer(this.gl.ARRAY_BUFFER, this.texCoordBuffer);
+    this.gl.enableVertexAttribArray(texCoordLocation);
+    this.gl.vertexAttribPointer(
+      texCoordLocation,
+      2,
+      this.gl.FLOAT,
+      false,
+      0,
+      0
+    );
+ 
+    // Draw all particles
+    for (const particle of this.particles) {
+      const geometry = this.generateParticleGeometry(particle);
+ 
+      // Create model matrix for this particle's position
+      const modelMatrix = this.identityMatrix();
+      modelMatrix[12] = particle.x; // Translate X
+      modelMatrix[13] = particle.y; // Translate Y
+      modelMatrix[14] = particle.z; // Translate Z
+ 
+      // Combine view and model matrices
+      const modelViewMatrix = this.multiplyMatrices(viewMatrix, modelMatrix);
+ 
+      // Update modelView matrix uniform for this particle
+      this.gl.uniformMatrix4fv(modelViewLocation, false, modelViewMatrix);
+ 
+      // Update time uniform for individual particle rotation
+      const individualRotationTime = particle.individualTime * 2; // Scale up rotation speed
+      this.gl.uniform1f(timeLocation, individualRotationTime);
+ 
+      // Update rotation speeds for this particle
+      this.gl.uniform3f(
+        rotationSpeedsLocation,
+        particle.rotationSpeedX,
+        particle.rotationSpeedY,
+        particle.rotationSpeedZ
+      );
+ 
+      // Update color for this particle
+      const colorLocation = this.gl.getUniformLocation(this.program, "u_color");
+      if (colorLocation) {
+        this.gl.uniform4f(
+          colorLocation,
+          particle.color.r,
+          particle.color.g,
+          particle.color.b,
+          1.0
+        );
+      }
+ 
+      // Create buffers for this particle
+      const positionBuffer = this.gl.createBuffer();
+      this.gl.bindBuffer(this.gl.ARRAY_BUFFER, positionBuffer);
+      this.gl.bufferData(
+        this.gl.ARRAY_BUFFER,
+        new Float32Array(geometry.vertices),
+        this.gl.STATIC_DRAW
+      );
+ 
+      const normalBuffer = this.gl.createBuffer();
+      this.gl.bindBuffer(this.gl.ARRAY_BUFFER, normalBuffer);
+      this.gl.bufferData(
+        this.gl.ARRAY_BUFFER,
+        new Float32Array(geometry.normals),
+        this.gl.STATIC_DRAW
+      );
+ 
+      const texCoordBuffer = this.gl.createBuffer();
+      this.gl.bindBuffer(this.gl.ARRAY_BUFFER, texCoordBuffer);
+      this.gl.bufferData(
+        this.gl.ARRAY_BUFFER,
+        new Float32Array(geometry.texCoords),
+        this.gl.STATIC_DRAW
+      );
+ 
+      const indexBuffer = this.gl.createBuffer();
+      this.gl.bindBuffer(this.gl.ELEMENT_ARRAY_BUFFER, indexBuffer);
+      this.gl.bufferData(
+        this.gl.ELEMENT_ARRAY_BUFFER,
+        new Uint16Array(geometry.indices),
+        this.gl.STATIC_DRAW
+      );
+ 
+      // Set up attributes for this particle
+      this.gl.bindBuffer(this.gl.ARRAY_BUFFER, positionBuffer);
+      this.gl.enableVertexAttribArray(positionLocation);
+      this.gl.vertexAttribPointer(
+        positionLocation,
+        3,
+        this.gl.FLOAT,
+        false,
+        0,
+        0
+      );
+ 
+      this.gl.bindBuffer(this.gl.ARRAY_BUFFER, normalBuffer);
+      this.gl.enableVertexAttribArray(normalLocation);
+      this.gl.vertexAttribPointer(
+        normalLocation,
+        3,
+        this.gl.FLOAT,
+        false,
+        0,
+        0
+      );
+ 
+      this.gl.bindBuffer(this.gl.ARRAY_BUFFER, texCoordBuffer);
+      this.gl.enableVertexAttribArray(texCoordLocation);
+      this.gl.vertexAttribPointer(
+        texCoordLocation,
+        2,
+        this.gl.FLOAT,
+        false,
+        0,
+        0
+      );
+ 
+      // Draw this particle
+      this.gl.bindBuffer(this.gl.ELEMENT_ARRAY_BUFFER, indexBuffer);
+      this.gl.drawElements(
+        this.gl.TRIANGLES,
+        geometry.indices.length,
+        this.gl.UNSIGNED_SHORT,
+        0
+      );
+    }
+ 
+    // Continue animation
+    this.animationId = requestAnimationFrame(this.render);
+  };
+ 
+  stop() {
+    if (this.animationId) {
+      cancelAnimationFrame(this.animationId);
+      this.animationId = null;
+    }
+  }
+}
+
+export const VertexShaderSource = `
+  attribute vec3 a_position;
+  attribute vec3 a_normal;
+  attribute vec2 a_texCoord;
+  
+  uniform mat4 u_modelViewMatrix;
+  uniform mat4 u_projectionMatrix;
+  uniform mat4 u_normalMatrix;
+  uniform float u_time;
+  uniform vec3 u_rotationSpeeds;
+  
+  varying vec3 v_normal;
+  varying vec3 v_position;
+  varying vec2 v_texCoord;
+  
+  void main() {
+    // Apply individual rotation speeds for each particle (tsParticles style)
+    float angleX = u_time * u_rotationSpeeds.x;
+    float angleY = u_time * u_rotationSpeeds.y;
+    float angleZ = u_time * u_rotationSpeeds.z;
+    
+    mat4 rotationX = mat4(
+      1.0, 0.0, 0.0, 0.0,
+      0.0, cos(angleX), -sin(angleX), 0.0,
+      0.0, sin(angleX), cos(angleX), 0.0,
+      0.0, 0.0, 0.0, 1.0
+    );
+    
+    mat4 rotationY = mat4(
+      cos(angleY), 0.0, sin(angleY), 0.0,
+      0.0, 1.0, 0.0, 0.0,
+      -sin(angleY), 0.0, cos(angleY), 0.0,
+      0.0, 0.0, 0.0, 1.0
+    );
+    
+    mat4 rotationZ = mat4(
+      cos(angleZ), -sin(angleZ), 0.0, 0.0,
+      sin(angleZ), cos(angleZ), 0.0, 0.0,
+      0.0, 0.0, 1.0, 0.0,
+      0.0, 0.0, 0.0, 1.0
+    );
+    
+    vec4 rotatedPosition = rotationX * rotationY * rotationZ * vec4(a_position, 1.0);
+    vec4 rotatedNormal = rotationX * rotationY * rotationZ * vec4(a_normal, 0.0);
+    
+    gl_Position = u_projectionMatrix * u_modelViewMatrix * rotatedPosition;
+    v_normal = normalize((u_normalMatrix * rotatedNormal).xyz);
+    v_position = (u_modelViewMatrix * rotatedPosition).xyz;
+    v_texCoord = a_texCoord;
+  }
+`;
+ 
+export const FragmentShaderSource = `
+  precision mediump float;
+  
+  varying vec3 v_normal;
+  varying vec3 v_position;
+  varying vec2 v_texCoord;
+  
+  uniform vec3 u_lightPosition;
+  uniform vec3 u_viewPosition;
+  uniform vec3 u_lightColor;
+  uniform vec3 u_objectColor;
+  uniform vec4 u_color;
+  uniform float u_mode;
+  
+  void main() {
+    // Normalize vectors
+    vec3 norm = normalize(v_normal);
+    vec3 lightDir = normalize(u_lightPosition - v_position);
+    vec3 viewDir = normalize(u_viewPosition - v_position);
+    
+    // Ambient lighting (increased for bigger light effect)
+    float ambientStrength = 0.4;
+    vec3 ambient = ambientStrength * u_lightColor;
+    
+    // Diffuse lighting (allow both sides to be lit, enhanced for bigger light)
+    float diff = abs(dot(norm, lightDir));
+    vec3 diffuse = diff * u_lightColor * 1.2;
+    
+    // Specular lighting (metallic reflection)
+    float specularStrength = 0.8;
+    vec3 reflectDir = reflect(-lightDir, norm);
+    float spec = pow(max(dot(viewDir, reflectDir), 0.0), 64.0);
+    vec3 specular = specularStrength * spec * u_lightColor;
+    
+    // Fresnel effect for metallic look (reduced to maintain gold color)
+    float fresnel = pow(1.0 - max(dot(norm, viewDir), 0.0), 2.0);
+    vec3 fresnelColor = mix(u_objectColor, u_lightColor, fresnel * 0.1);
+    
+    // Use particle color for bonus mode, object color for jackpot mode
+    vec3 baseColor = u_mode > 0.5 ? u_color.rgb : u_objectColor;
+    
+    // Combine lighting with the appropriate color
+    vec3 result = (ambient + diffuse + specular) * baseColor;
+    gl_FragColor = vec4(result, 1.0);
+  }
+`;

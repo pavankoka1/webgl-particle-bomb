@@ -111,6 +111,9 @@ export class GlRenderer {
   private depthScaleUniformLocation: WebGLUniformLocation | null = null;
   private zPositionUniformLocation: WebGLUniformLocation | null = null;
   private useLightingUniformLocation: WebGLUniformLocation | null = null;
+  private modeUniformLocation: WebGLUniformLocation | null = null;
+  private lightColorUniformLocation: WebGLUniformLocation | null = null;
+  private objectColorUniformLocation: WebGLUniformLocation | null = null;
 
   // Lighting toggle (true = lighting on)
   private useLighting: boolean = true;
@@ -166,6 +169,11 @@ export class GlRenderer {
     );
 
     this.program = this.createProgram(vertexShader, fragmentShader);
+    console.log('🎨 SHADER COMPILED SUCCESSFULLY with improvements:', {
+      shapeFormula: 'z = x²/a² - y²/b² (improved)',
+      lightingSystem: 'Enhanced ambient + diffuse + specular + fresnel',
+      modeSupport: 'Mode-based color selection (0=jackpot, 1=bonus)'
+    });
     this.init();
   }
 
@@ -383,10 +391,13 @@ export class GlRenderer {
       const rotationSpeedY = (Math.random() - 0.5) * 0.26;
       const rotationSpeedZ = (Math.random() - 0.5) * 0.56;
       const color: [number, number, number, number] = colorPalette[Math.floor(Math.random() * colorPalette.length)];
-      const metallic = mergedConfig.mode === 'jackpot' ? (mergedConfig.metallic ?? 0.8) : 0.0;
-      const roughness = mergedConfig.mode === 'jackpot' ? (mergedConfig.roughness ?? 0.2) : 1.0;
-      const depthA = 80.0 + Math.random() * 160.0;
-      const depthB = 70.0 + Math.random() * 140.0;
+      // Give both modes metallic properties for better lighting effects
+      const metallic = mergedConfig.mode === 'jackpot' ? (mergedConfig.metallic ?? 0.8) : 0.3;
+      const roughness = mergedConfig.mode === 'jackpot' ? (mergedConfig.roughness ?? 0.2) : 0.6;
+      // Use smaller depth values like sample for more pronounced effects
+      const depthA = 1.5 + Math.random() * 1.0; // Like sample: 1.5-2.5
+      const depthB = 1.5 + Math.random() * 1.0; // Like sample: 1.5-2.5
+      // Use smaller depth scale like sample
       const depthScale = 0.04 + Math.random() * 0.12;
       const fallSpeed = particleType === 'leaf' ? (mergedConfig.fallSpeed ?? 0.6) * 0.4 : (mergedConfig.fallSpeed ?? 0.6); // Much slower for leaves
       const life = particleType === 'fade' ? 1000 + Math.random() * 600 : 2000 + Math.random() * 1000; // Longer life
@@ -437,12 +448,27 @@ export class GlRenderer {
           explosionScatter,
           mergedConfig.windStrength ?? 0.0,
           mergedConfig.windDirection ?? 0.0,
-          fadeInExplosion
+          fadeInExplosion,
+          mergedConfig.mode === 'bonus' ? 1.0 : 0.0 // Mode: 0 = jackpot, 1 = bonus
         )
       );
     }
 
     console.log(`✨ Created ${this.particles.length} particles for bomb explosion from deep Z`);
+    console.log('🎨 SHADER IMPROVEMENTS DEBUG:', {
+      mode: mergedConfig.mode,
+      useLighting: mergedConfig.useLighting,
+      particleCount: this.particles.length,
+      shapeFormula: 'z = x²/a² - y²/b² * 15.0 (extreme scaling)',
+      lightingSystem: 'Sample lighting: ambient + diffuse + specular + fresnel',
+      colorMode: mergedConfig.mode === 'bonus' ? 'Particle colors' : 'Gold object colors',
+      metallic: mergedConfig.metallic,
+      roughness: mergedConfig.roughness,
+      defaultMetallic: mergedConfig.mode === 'jackpot' ? (mergedConfig.metallic ?? 0.8) : 0.3,
+      defaultRoughness: mergedConfig.mode === 'jackpot' ? (mergedConfig.roughness ?? 0.2) : 0.6,
+      depthRange: '1.5-2.5 (like sample)',
+      shapeScaling: '15.0x (extreme like sample)'
+    });
   }
 
   private generateRandomParticles(count: number) {
@@ -546,6 +572,18 @@ export class GlRenderer {
     this.useLightingUniformLocation = this.gl.getUniformLocation(
       this.program,
       "u_useLighting"
+    );
+    this.modeUniformLocation = this.gl.getUniformLocation(
+      this.program,
+      "u_mode"
+    );
+    this.lightColorUniformLocation = this.gl.getUniformLocation(
+      this.program,
+      "u_lightColor"
+    );
+    this.objectColorUniformLocation = this.gl.getUniformLocation(
+      this.program,
+      "u_objectColor"
     );
 
     // Create a buffer for circle vertices
@@ -668,6 +706,15 @@ export class GlRenderer {
     if (this.useLightingUniformLocation) {
       this.gl.uniform1f(this.useLightingUniformLocation, this.useLighting ? 1.0 : 0.0);
     }
+    if (this.modeUniformLocation) {
+      this.gl.uniform1f(this.modeUniformLocation, 0.0); // Default to jackpot mode (0)
+    }
+    if (this.lightColorUniformLocation) {
+      this.gl.uniform3f(this.lightColorUniformLocation, 1.4, 1.2, 0.8); // Gold light color like sample
+    }
+    if (this.objectColorUniformLocation) {
+      this.gl.uniform3f(this.objectColorUniformLocation, 0.796, 0.557, 0.243); // Gold object color like sample
+    }
   }
 
   private updatePosition() {
@@ -782,6 +829,23 @@ export class GlRenderer {
     }
     if (this.zPositionUniformLocation) {
       this.gl.uniform1f(this.zPositionUniformLocation, particle.centerZ); // Pass Z position
+    }
+
+    // Set mode uniform based on particle mode (from sample code)
+    if (this.modeUniformLocation) {
+      // Use particle's mode property (0 = jackpot, 1 = bonus)
+      this.gl.uniform1f(this.modeUniformLocation, particle.mode);
+      // Debug mode uniform setting
+      if (Math.random() < 0.01) { // Log 1% of particles to avoid spam
+        console.log('🎭 MODE UNIFORM DEBUG:', {
+          particleMode: particle.mode,
+          modeName: particle.mode === 0 ? 'jackpot' : 'bonus',
+          metallic: particle.metallic,
+          roughness: particle.roughness,
+          color: particle.color,
+          useLighting: this.useLighting
+        });
+      }
     }
 
     // Draw the particle

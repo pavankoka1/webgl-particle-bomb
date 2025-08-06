@@ -62,6 +62,9 @@ export class Particle {
   // If true, particle starts transparent and fades in during explosion phase
   fadeInExplosion: boolean = false;
   complete: boolean = false;
+  
+  // Mode for color selection (0 = jackpot, 1 = bonus)
+  mode: number = 0;
 
   p0?: { x: number; y: number; z: number };
   p1?: { x: number; y: number; z: number };
@@ -104,7 +107,8 @@ export class Particle {
     explosionScatter: { x: number; y: number; z: number } | null = null,
     windStrength: number = 0.0,
     windDirection: number = 0.0,
-    fadeInExplosion: boolean = false
+    fadeInExplosion: boolean = false,
+    mode: number = 0
   ) {
     this.centerX = centerX;
     this.centerY = centerY;
@@ -139,6 +143,7 @@ export class Particle {
     this.windStrength = windStrength;
     this.windDirection = windDirection;
     this.fadeInExplosion = fadeInExplosion;
+    this.mode = mode;
 
     // Calculate explosion velocities from Bezier points
     if (p0 && p1 && p2 && p3) {

@@ -30,12 +30,12 @@ export const GlWorkshop: FC = () => {
     explosionDuration: 0.03, // Much faster explosion (30ms)
     explosionForce: 5000, // Much stronger force for dramatic bomb effect
     particleRadiusMin: 2,
-    particleRadiusMax: 12,
-    settlingDuration: 6, // Longer settling for more dramatic effect
-    swingAmplitude: 50, // Reduced swing for more realistic movement
+    particleRadiusMax: 16,
+    settlingDuration: 8, // Longer settling for more dramatic effect
+    swingAmplitude: 80, // Reduced swing for more realistic movement
     fallSpeed: 0.6, // Slightly faster fall
-    gravity: 6, // Stronger gravity
-    airResistance: 0.985, // Slightly more air resistance
+    gravity: 4, // Stronger gravity
+    airResistance: 0.988, // Slightly more air resistance
     zScatter: 2000, // More Z scatter for depth
     cameraDistance: 10000,
     centerX: 0.5, // 0=left, 1=right
@@ -50,7 +50,7 @@ export const GlWorkshop: FC = () => {
     windStrength: 0.0, // No wind by default
     windDirection: 0.0, // Wind direction in radians
     fadeInPercentage: 1,
-    useLighting: true,
+    useLighting: true, // Enable lighting to see shader improvements
   });
 
 
