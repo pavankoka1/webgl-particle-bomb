@@ -61,7 +61,7 @@ export const GlWorkshop: FC = () => {
     const canvas = ref.current;
     if (!canvas) return;
 
-    const gl = canvas.getContext("webgl");
+    const gl = canvas.getContext("webgl", { alpha: true, premultipliedAlpha: false });
     if (!gl) return;
 
     // Set canvas to iPhone aspect ratio with 80-85% screen height
@@ -204,6 +204,10 @@ export const GlWorkshop: FC = () => {
       width: "100vw",
       height: "100vh",
       overflow: "hidden",
+      backgroundImage: "url('/images/bg.png')",
+      backgroundSize: 'cover',
+      backgroundRepeat: 'no-repeat',
+      backgroundPosition: 'center',
       backgroundColor: "#000",
       display: "flex",
       justifyContent: "center",
@@ -229,6 +233,10 @@ export const GlWorkshop: FC = () => {
             height: "100%",
             cursor: "pointer",
             backgroundColor: "transparent",
+            position: "absolute",
+            top: 0,
+            left: 0,
+            zIndex: 1,
           }}
         />
       </div>

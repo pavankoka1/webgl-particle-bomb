@@ -52,11 +52,11 @@ function easeOutCubic(t: number) {
 }
 
 const COLOR_PALETTE: [number, number, number, number][] = [
-    [254/255, 56/255, 56/255, 1],    // #FE3838 red
-    [4/255, 125/255, 255/255, 1],    // #047DFF blue
-    [255/255, 206/255, 109/255, 1],  // #FFCE6D yellow
-    [60/255, 191/255, 44/255, 1],    // #3CBF2C green
-    [175/255, 116/255, 255/255, 1],  // #AF74FF purple
+    [254 / 255, 56 / 255, 56 / 255, 1],    // #FE3838 red
+    [4 / 255, 125 / 255, 255 / 255, 1],    // #047DFF blue
+    [255 / 255, 206 / 255, 109 / 255, 1],  // #FFCE6D yellow
+    [60 / 255, 191 / 255, 44 / 255, 1],    // #3CBF2C green
+    [175 / 255, 116 / 255, 255 / 255, 1],  // #AF74FF purple
 ];
 
 export const GlRendererFC: React.FC<GlRendererFCProps> = ({
@@ -80,7 +80,7 @@ export const GlRendererFC: React.FC<GlRendererFCProps> = ({
         if (!canvas) return;
         canvas.width = window.innerWidth;
         canvas.height = window.innerHeight;
-        const gl = canvas.getContext("webgl");
+        const gl = canvas.getContext("webgl", { alpha: true, premultipliedAlpha: false });
         if (!gl) return;
 
         // Vertex shader: Lays chip, 3D rotation, depth scaling
@@ -168,7 +168,12 @@ export const GlRendererFC: React.FC<GlRendererFCProps> = ({
             return;
         }
         gl.useProgram(program);
-        gl.clearColor(0, 0, 0, 1);
+        
+        // Enable alpha blending for transparency
+        gl.enable(gl.BLEND);
+        gl.blendFunc(gl.SRC_ALPHA, gl.ONE_MINUS_SRC_ALPHA);
+        
+        gl.clearColor(0, 0, 0, 0);
 
         // Chip geometry: triangle fan (Lays-like curve in 2D)
         const segments = 32;

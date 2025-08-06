@@ -159,6 +159,13 @@ export class GlRenderer {
   constructor(gl: WebGLRenderingContext) {
     this.gl = gl;
 
+    // Enable alpha blending for transparency
+    this.gl.enable(this.gl.BLEND);
+    this.gl.blendFunc(this.gl.SRC_ALPHA, this.gl.ONE_MINUS_SRC_ALPHA);
+
+    // Set clear color to transparent
+    this.gl.clearColor(0, 0, 0, 0);
+
     const vertexShader = this.createShader(
       this.gl.VERTEX_SHADER,
       VertexShaderSource
@@ -623,7 +630,7 @@ export class GlRenderer {
     this.gl.viewport(0, 0, this.gl.canvas.width, this.gl.canvas.height);
 
     // Clear the canvas
-    this.gl.clearColor(0, 0, 0, 1);
+    this.gl.clearColor(0, 0, 0, 0);
     this.gl.clear(this.gl.COLOR_BUFFER_BIT);
 
     // Enable blending for alpha transparency
@@ -740,8 +747,8 @@ export class GlRenderer {
   }
 
   private animate = () => {
-    // Clear the canvas
-    this.gl.clear(this.gl.COLOR_BUFFER_BIT);
+    // Clear the canvas with transparency
+    this.gl.clear(this.gl.COLOR_BUFFER_BIT | this.gl.DEPTH_BUFFER_BIT);
 
     // Update all particles
     this.updatePosition();
