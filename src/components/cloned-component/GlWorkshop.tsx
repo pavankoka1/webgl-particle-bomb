@@ -243,10 +243,6 @@ export const GlWorkshop: FC = () => {
                 width: "100vw",
                 height: "100vh",
                 overflow: "hidden",
-                backgroundImage: "url('/images/bg.png')",
-                backgroundSize: "cover",
-                backgroundRepeat: "no-repeat",
-                backgroundPosition: "center",
                 backgroundColor: "#000",
                 display: "flex",
                 justifyContent: "center",
@@ -260,14 +256,17 @@ export const GlWorkshop: FC = () => {
                     width:
                         displayMode === "mobile"
                             ? mobileDimensions.width ||
-                              window.innerHeight * 0.82 * IPHONE_ASPECT_RATIO
+                            window.innerHeight * 0.82 * IPHONE_ASPECT_RATIO
                             : "100%",
                     height:
                         displayMode === "mobile"
                             ? mobileDimensions.height ||
-                              window.innerHeight * 0.82
+                            window.innerHeight * 0.82
                             : "100%",
-                    backgroundColor: "transparent",
+                    backgroundImage: "url('/images/bg.png')",
+                    backgroundSize: "cover",
+                    backgroundRepeat: "no-repeat",
+                    backgroundPosition: "center",
                     borderRadius: displayMode === "mobile" ? "60px" : 0,
                     border:
                         displayMode === "mobile" ? "8px solid #333" : "none",
