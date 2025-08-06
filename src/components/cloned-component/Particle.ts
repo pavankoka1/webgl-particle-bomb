@@ -35,6 +35,20 @@ export class Particle {
   approachSpeed: number = 0;
   explosionScatter: { x: number; y: number; z: number } | null = null;
 
+  // NEW: Explosion enhancement properties
+  explosionStartVelocity: { x: number; y: number; z: number } = { x: 0, y: 0, z: 0 };
+  explosionEndVelocity: { x: number; y: number; z: number } = { x: 0, y: 0, z: 0 };
+  explosionCurveOffset: { x: number; y: number; z: number } = { x: 0, y: 0, z: 0 };
+  explosionRotationMultiplier: number = 1;
+  opacityFadeType: 'immediate' | 'delayed' | 'late' = 'immediate';
+
+  // NEW: Spiral trajectory properties
+  spiralRadius: number = 0;
+  spiralFrequency: number = 0;
+  spiralPhase: number = 0;
+  trajectoryDirection: { x: number; y: number; z: number } = { x: 0, y: 0, z: 0 };
+  trajectoryLength: number = 0;
+
   // Settling phase properties
   settlingDuration: number;
   settlingTime: number = 0;
@@ -62,7 +76,7 @@ export class Particle {
   // If true, particle starts transparent and fades in during explosion phase
   fadeInExplosion: boolean = false;
   complete: boolean = false;
-  
+
   // Mode for color selection (0 = jackpot, 1 = bonus)
   mode: number = 0;
 
@@ -145,6 +159,9 @@ export class Particle {
     this.fadeInExplosion = fadeInExplosion;
     this.mode = mode;
 
+    // NEW: Enhanced explosion setup
+    this.setupEnhancedExplosion(p0, p1, p2, p3, explosionScatter);
+
     // Calculate explosion velocities from Bezier points
     if (p0 && p1 && p2 && p3) {
       // Calculate initial explosion velocity (from p0 to p2)
@@ -172,6 +189,154 @@ export class Particle {
     this.approachTargetZ = approachTargetZ;
     this.approachSpeed = approachSpeed;
     this.explosionScatter = explosionScatter;
+  }
+
+  // NEW: Setup enhanced explosion with gun-like effect
+  private setupEnhancedExplosion(
+    p0?: { x: number; y: number; z: number },
+    p1?: { x: number; y: number; z: number },
+    p2?: { x: number; y: number; z: number },
+    p3?: { x: number; y: number; z: number },
+    explosionScatter?: { x: number; y: number; z: number } | null
+  ) {
+    if (!explosionScatter) return;
+
+    // Calculate trajectory direction and length
+    this.trajectoryDirection = {
+      x: explosionScatter.x,
+      y: explosionScatter.y,
+      z: explosionScatter.z
+    };
+
+    // Normalize direction
+    const length = Math.sqrt(
+      this.trajectoryDirection.x * this.trajectoryDirection.x +
+      this.trajectoryDirection.y * this.trajectoryDirection.y +
+      this.trajectoryDirection.z * this.trajectoryDirection.z
+    );
+
+    this.trajectoryLength = length;
+    this.trajectoryDirection.x /= length;
+    this.trajectoryDirection.y /= length;
+    this.trajectoryDirection.z /= length;
+
+    // --- Spiral parameters you can TWEAK easily ---
+    const SPIRAL_RADIUS_MULTIPLIER = 0.35;   // from 0.15 → 0.35  (much wider)
+    const MIN_SPIRAL_ROTATIONS = 0.5;    // half-turn is enough
+    const MAX_SPIRAL_ROTATIONS = 1.2;
+
+    // Setup spiral properties (spiral around the axis)
+    this.spiralRadius = length * SPIRAL_RADIUS_MULTIPLIER;
+    this.spiralFrequency =
+      MIN_SPIRAL_ROTATIONS + Math.random() * (MAX_SPIRAL_ROTATIONS - MIN_SPIRAL_ROTATIONS);
+    this.spiralPhase = Math.random() * Math.PI * 2; // Random starting phase
+
+    // EASE-IN explosion: start fast, slow down at the end
+    // Use actual explosion duration for velocity calculation
+    this.explosionStartVelocity = {
+      x: explosionScatter.x / this.explosionDuration * 2.0, // Start at 2x speed
+      y: explosionScatter.y / this.explosionDuration * 2.0,
+      z: explosionScatter.z / this.explosionDuration * 2.0
+    };
+
+    this.explosionEndVelocity = {
+      x: explosionScatter.x / this.explosionDuration * 0.1, // End at 0.1x speed
+      y: explosionScatter.y / this.explosionDuration * 0.1,
+      z: explosionScatter.z / this.explosionDuration * 0.1
+    };
+
+    // Add curved trajectory offset for more natural movement
+    const curveStrength = 0.3;
+    this.explosionCurveOffset = {
+      x: (Math.random() - 0.5) * explosionScatter.x * curveStrength,
+      y: (Math.random() - 0.5) * explosionScatter.y * curveStrength,
+      z: (Math.random() - 0.5) * explosionScatter.z * curveStrength
+    };
+
+    // --- SPIN parameters you can TWEAK easily ---
+    const MIN_SPIN_MULTIPLIER = 5;
+    const MAX_SPIN_MULTIPLIER = 10;
+    const SPIN_BASE_SPEED = 0.1;   // degrees added per frame-step
+    // Reduced spin to a more reasonable range
+    this.explosionRotationMultiplier =
+      (MIN_SPIN_MULTIPLIER + Math.random() * (MAX_SPIN_MULTIPLIER - MIN_SPIN_MULTIPLIER)) * 0.01;
+
+    // Opacity fade-in timing: 70% immediate, 20% delayed, 10% late
+    const fadeRoll = Math.random();
+    if (fadeRoll < 0.02) {
+      this.opacityFadeType = 'immediate'; // 70% - start visible
+    } else if (fadeRoll < 0.1) {
+      this.opacityFadeType = 'delayed'; // 20% - fade in by 50%
+    } else {
+      this.opacityFadeType = 'late'; // 10% - fade in by 80%
+    }
+  }
+
+  // NEW: Calculate spiral offset around trajectory
+  private getSpiralOffset(progress: number): { x: number; y: number; z: number } {
+    const spiralAngle = this.spiralPhase + progress * this.spiralFrequency * Math.PI * 2;
+
+    // Calculate perpendicular vectors to trajectory direction
+    const perp1 = { x: -this.trajectoryDirection.y, y: this.trajectoryDirection.x, z: 0 };
+    const perp2 = {
+      x: this.trajectoryDirection.y * this.trajectoryDirection.z,
+      y: -this.trajectoryDirection.x * this.trajectoryDirection.z,
+      z: this.trajectoryDirection.x * this.trajectoryDirection.x + this.trajectoryDirection.y * this.trajectoryDirection.y
+    };
+
+    // Normalize perpendicular vectors
+    const perp1Len = Math.sqrt(perp1.x * perp1.x + perp1.y * perp1.y + perp1.z * perp1.z);
+    const perp2Len = Math.sqrt(perp2.x * perp2.x + perp2.y * perp2.y + perp2.z * perp2.z);
+
+    perp1.x /= perp1Len;
+    perp1.y /= perp1Len;
+    perp1.z /= perp1Len;
+
+    perp2.x /= perp2Len;
+    perp2.y /= perp2Len;
+    perp2.z /= perp2Len;
+
+    // flare-out for the first 40 % of travel, then fall back in
+    const flare = progress < 0.4 ? progress / 0.4         // 0 → 1
+      : 1 - (progress - 0.4) / 0.6; // 1 → 0
+    const spiralRadius = this.spiralRadius * flare;
+    const offsetX = (perp1.x * Math.cos(spiralAngle) + perp2.x * Math.sin(spiralAngle)) * spiralRadius;
+    const offsetY = (perp1.y * Math.cos(spiralAngle) + perp2.y * Math.sin(spiralAngle)) * spiralRadius;
+    const offsetZ = (perp1.z * Math.cos(spiralAngle) + perp2.z * Math.sin(spiralAngle)) * spiralRadius;
+
+    return { x: offsetX, y: offsetY, z: offsetZ };
+  }
+
+  // NEW: Calculate ease-out (slow start – fast end) velocity during explosion
+  private getExplosionVelocity(progress: number): { x: number; y: number; z: number } {
+    // Quadratic ease-out  → starts slow, ends fast
+    // const easeOutProgress = Math.pow(1 - progress, 2);
+    // const easeOutProgress = progress;
+    const easeOutProgress = 1 - Math.pow(progress, 2);
+
+    return {
+      x:
+        this.explosionStartVelocity.x +
+        (this.explosionEndVelocity.x - this.explosionStartVelocity.x) * easeOutProgress,
+      y:
+        this.explosionStartVelocity.y +
+        (this.explosionEndVelocity.y - this.explosionStartVelocity.y) * easeOutProgress,
+      z:
+        this.explosionStartVelocity.z +
+        (this.explosionEndVelocity.z - this.explosionStartVelocity.z) * easeOutProgress,
+    };
+  }
+
+  // NEW: Calculate curved trajectory offset
+  private getCurvedTrajectoryOffset(progress: number): { x: number; y: number; z: number } {
+    // Sine wave curve for natural movement
+    const curveProgress = Math.sin(progress * Math.PI * 2) * 0.5 + 0.5;
+
+    return {
+      x: this.explosionCurveOffset.x * curveProgress,
+      y: this.explosionCurveOffset.y * curveProgress,
+      z: this.explosionCurveOffset.z * curveProgress
+    };
   }
 
   update(canvasWidth: number, canvasHeight: number) {
@@ -213,20 +378,35 @@ export class Particle {
     }
 
     if (this.phase === 'explosion') {
-      // EXPLOSION PHASE: Particles burst outward from center
+      // ENHANCED EXPLOSION PHASE: Spiral trajectory with extreme rotation
       this.phaseTime += timeStep;
-      this.centerX += this.velocityX * timeStep;
-      this.centerY += this.velocityY * timeStep;
-      this.centerZ += this.velocityZ * timeStep;
+      const explosionProgress = Math.min(1, this.phaseTime / this.explosionDuration);
 
-      // Moderate rotation during explosion (reduced to prevent glitchy appearance)
-      this.rotationX += this.rotationSpeedX * 80;
-      this.rotationY += this.rotationSpeedY * 80;
-      this.rotationZ += this.rotationSpeedZ * 80;
+      // Calculate ease-in velocity
+      const currentVelocity = this.getExplosionVelocity(explosionProgress);
 
-      // Subtle wobble effect during explosion
-      const explosionProgress = this.phaseTime / this.explosionDuration;
-      this.sy = Math.sin(explosionProgress * Math.PI * 20) * 0.2 + 0.8;
+      // Calculate spiral offset around trajectory
+      const spiralOffset = this.getSpiralOffset(explosionProgress);
+
+      // Update position with ease-in velocity and spiral trajectory
+      this.centerX += (currentVelocity.x + spiralOffset.x) * timeStep;
+      this.centerY += (currentVelocity.y + spiralOffset.y) * timeStep;
+      this.centerZ += (currentVelocity.z + spiralOffset.z) * timeStep;
+
+      // Prevent particles from crossing the camera plane (Z > 0)
+      if (this.centerZ > -50) {
+        this.centerZ = -50; // stop 50px in front of camera
+      }
+
+      // Controlled rotation (spin) during explosion – adjust via MIN/MAX_SPIN_MULTIPLIER above
+      // Finer self-spin control – make it easy to adjust from one constant
+      const SPIN_BASE_SPEED = 5;  // lower = less self rotation
+      this.rotationX += this.rotationSpeedX * this.explosionRotationMultiplier * SPIN_BASE_SPEED;
+      this.rotationY += this.rotationSpeedY * this.explosionRotationMultiplier * SPIN_BASE_SPEED;
+      this.rotationZ += this.rotationSpeedZ * this.explosionRotationMultiplier * SPIN_BASE_SPEED;
+
+      // Enhanced wobble effect during explosion
+      this.sy = Math.sin(explosionProgress * Math.PI * 50) * 0.4 + 0.6; // More dramatic wobble
 
       // Check if explosion phase is complete
       if (this.phaseTime >= this.explosionDuration) {
@@ -252,8 +432,8 @@ export class Particle {
       const windY = Math.sin(this.windDirection) * this.windStrength;
 
       // Reduced swing motion (can be disabled by setting swingAmplitude to 0)
-      const swingX = Math.sin(this.swingPhase) * this.swingAmplitude * 0.01;
-      const swingY = Math.cos(this.swingPhase * 0.7) * this.swingAmplitude * 0.005;
+      const swingX = Math.sin(this.swingPhase) * this.swingAmplitude * 0.02;
+      const swingY = Math.cos(this.swingPhase * 0.7) * this.swingAmplitude * 0.01;
       const swingZ = Math.sin(this.swingPhase * 0.5) * this.swingAmplitude * 0.001;
 
       // Apply wind and swing forces
@@ -325,19 +505,27 @@ export class Particle {
   }
 
   getAlpha(): number {
-    // Handle fade-in during explosion phase
-    if (this.fadeInExplosion) {
-      if (this.phase === 'approach') {
-        return 0.0; // fully transparent until explosion starts
+    // NEW: Enhanced opacity fade-in with specific timing requirements
+    if (this.phase === 'approach') {
+      return 0.0; // Always transparent during approach
+    }
+
+    if (this.phase === 'explosion') {
+      const explosionProgress = Math.min(1, this.phaseTime / this.explosionDuration);
+
+      // Handle different fade-in types based on timing requirements
+      if (this.opacityFadeType === 'immediate') {
+        // 70% of particles: start visible immediately
+        return 1.0;
+      } else if (this.opacityFadeType === 'delayed') {
+        // 20% of particles: fade in by 50% of explosion
+        const fadeProgress = Math.min(1, explosionProgress / 0.5);
+        return fadeProgress;
+      } else {
+        // 10% of particles: fade in by 80% of explosion
+        const fadeProgress = Math.min(1, explosionProgress / 0.8);
+        return fadeProgress;
       }
-      if (this.phase === 'explosion') {
-        // Use a minimum visible fade duration of 0.3 s so the effect is noticeable even if the explosion itself is very short
-        const fadeDuration = Math.max(this.explosionDuration, 0.3);
-        const progress = Math.min(1, this.phaseTime / fadeDuration);
-        console.log('💥 Particle fade-in progress:', progress, fadeDuration);
-        return progress; // 0 -> 1 during explosion
-      }
-      // After explosion, fully opaque
     }
 
     // For fade particles, fade out during settling phase

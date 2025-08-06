@@ -19,7 +19,7 @@ export const GlWorkshop: FC = () => {
     const [showConfig, setShowConfig] = useState(false);
     const [animationType, setAnimationType] =
         useState<AnimationType>("jackpot");
-    const [displayMode, setDisplayMode] = useState<DisplayMode>("web");
+    const [displayMode, setDisplayMode] = useState<DisplayMode>("mobile");
     const [sequenceType, setSequenceType] = useState<SequenceType>("single");
     const [mobileDimensions, setMobileDimensions] = useState({
         width: 0,
@@ -32,20 +32,20 @@ export const GlWorkshop: FC = () => {
     );
 
     const [config, setConfig] = useState<ExplosionConfig>({
-        particleCount: 600, // More particles for better bomb effect
-        explosionDuration: 0.03, // Much faster explosion (30ms)
-        explosionForce: 1800, // Much stronger force for dramatic bomb effect
+        particleCount: 120, // More particles for better bomb effect
+        explosionDuration: 0.5, // Much faster explosion (30ms)
+        explosionForce: 300, // Much stronger force for dramatic bomb effect
         particleRadiusMin: 2,
         particleRadiusMax: 16,
         settlingDuration: 8, // Longer settling for more dramatic effect
         swingAmplitude: 80, // Reduced swing for more realistic movement
         fallSpeed: 0.6, // Slightly faster fall
-        gravity: 4, // Stronger gravity
+        gravity: 10, // Stronger gravity
         airResistance: 0.988, // Slightly more air resistance
-        zScatter: 2000, // More Z scatter for depth
+        zScatter: 500, // More Z scatter for depth
         cameraDistance: 10000,
         centerX: 0.5, // 0=left, 1=right
-        centerY: 0.5, // 0.1 height from bottom
+        centerY: 0.3, // 0.1 height from bottom
         minX: 0.1, // 0=left edge, 1=right edge
         maxX: 0.9, // 0=left edge, 1=right edge
         minY: 0.1, // 0=bottom edge, 1=top edge
@@ -102,6 +102,8 @@ export const GlWorkshop: FC = () => {
         window.addEventListener("resize", resizeCanvas);
 
         const glRenderer = new GlRenderer(gl);
+        // Enable stronger motion blur (lower alpha keeps previous frames longer)
+        glRenderer.enableMotionBlur(0.03);
         setRenderer(glRenderer);
         glRenderer.start();
 

@@ -117,6 +117,19 @@ export class GlRenderer {
 
   // Lighting toggle (true = lighting on)
   private useLighting: boolean = true;
+  // --- Motion blur parameters ---
+  private motionBlurEnabled: boolean = false;
+  private motionBlurStrength: number = 0.08; // alpha used when clearing (0=full clear)
+
+  // Enable/disable motion blur
+  public enableMotionBlur(strength: number = 0.08) {
+    this.motionBlurEnabled = true;
+    this.motionBlurStrength = Math.min(Math.max(strength, 0), 1);
+  }
+
+  public disableMotionBlur() {
+    this.motionBlurEnabled = false;
+  }
 
   // Animation properties
   private animationId: number | null = null;
@@ -343,18 +356,33 @@ export class GlRenderer {
 
       // --- REVERT: Restore original explosion velocity logic ---
       // Calculate explosion scatter with more realistic physics
-      const scatterAngle = Math.random() * 2 * Math.PI;
-      // Use realistic explosion radius based on force
-      const explosionRadius = diagonal * (0.4 + Math.random() * 0.6); // Larger radius for more realistic spread
-      let targetX = explosionCenterX + Math.cos(scatterAngle) * explosionRadius;
-      let targetY = explosionCenterY + Math.sin(scatterAngle) * explosionRadius;
+      // RECTANGULAR EXPLOSION: Use rectangular distribution instead of circular
+      // This makes particles explode diagonally to better fill the rectangular screen
+      const aspectRatio = canvasWidth / canvasHeight;
+
+      // Generate random position within a rectangle that matches screen aspect ratio
+      const rectWidth = diagonal * (0.4 + Math.random() * 0.6);
+      const rectHeight = rectWidth / aspectRatio; // Maintain aspect ratio
+
+      // Random position within the rectangle (not just the circle)
+      const rectX = (Math.random() - 0.5) * rectWidth;
+      const rectY = (Math.random() - 0.5) * rectHeight;
+
+      // Convert to target position
+      let targetX = explosionCenterX + rectX;
+      let targetY = explosionCenterY + rectY;
       // NO BOUNDARY CLAMPING - particles can go outside canvas
       const targetZ = (Math.random() - 0.5) * (mergedConfig.zScatter ?? 2000) * 0.3; // More Z scatter
 
       // Explosion velocity with more realistic force distribution
       let explosionSpeed = (mergedConfig.explosionForce ?? 5000) * (1.0 + Math.random() * 1.0); // More varied speeds
-      let explosionDirX = (targetX - explosionCenterX) / explosionRadius;
-      let explosionDirY = (targetY - explosionCenterY) / explosionRadius;
+      // Calculate direction from explosion center to target
+      const distanceX = targetX - explosionCenterX;
+      const distanceY = targetY - explosionCenterY;
+      const distance = Math.sqrt(distanceX * distanceX + distanceY * distanceY);
+
+      let explosionDirX = distanceX / distance;
+      let explosionDirY = distanceY / distance;
       let explosionDirZ = (targetZ - 0) / (mergedConfig.zScatter ?? 2000);
 
       // For 10% of particles, reduce x/y and boost z direction for a more z-axis explosion
@@ -747,8 +775,16 @@ export class GlRenderer {
   }
 
   private animate = () => {
-    // Clear the canvas with transparency
-    this.gl.clear(this.gl.COLOR_BUFFER_BIT | this.gl.DEPTH_BUFFER_BIT);
+    // Clear the canvas – if motion blur is enabled, only fade previous frame using alpha
+    if (this.motionBlurEnabled) {
+      this.gl.enable(this.gl.BLEND);
+      this.gl.blendFunc(this.gl.SRC_ALPHA, this.gl.ONE_MINUS_SRC_ALPHA);
+      this.gl.clearColor(0, 0, 0, this.motionBlurStrength);
+      this.gl.clear(this.gl.COLOR_BUFFER_BIT);
+    } else {
+      this.gl.clearColor(0, 0, 0, 0);
+      this.gl.clear(this.gl.COLOR_BUFFER_BIT | this.gl.DEPTH_BUFFER_BIT);
+    }
 
     // Update all particles
     this.updatePosition();
