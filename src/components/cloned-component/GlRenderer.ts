@@ -366,12 +366,24 @@ export class GlRenderer {
 
       // Random position within the rectangle (not just the circle)
       const rectX = (Math.random() - 0.5) * rectWidth;
-      const rectY = (Math.random() - 0.5) * rectHeight;
+      let rectY = (Math.random() - 0.5) * rectHeight;
+      // Keep delayed particles closer to explosion center vertically
+      if (explosionType === 'delayed') {
+        rectY *= 0.5; // compress Y spread by half
+      }
 
       // Convert to target position
       let targetX = explosionCenterX + rectX;
       let targetY = explosionCenterY + rectY;
-      // NO BOUNDARY CLAMPING - particles can go outside canvas
+
+      // Clamp Y for delayed particles so most stay within 0-80 % screen height
+      if (explosionType === 'delayed') {
+        const maxMain = canvasHeight * 0.8; // 80 %
+        const maxOverflow = canvasHeight * 0.1; // allow some to 90 %
+        if (targetY > maxMain) {
+          targetY = maxMain + Math.random() * maxOverflow;
+        }
+      }
       const targetZ = (Math.random() - 0.5) * (mergedConfig.zScatter ?? 2000) * 0.3; // More Z scatter
 
       // Explosion velocity with more realistic force distribution
@@ -508,7 +520,7 @@ export class GlRenderer {
     console.log('🔄 NEW EXPLOSION LOGIC:', {
       centerParticles: Math.floor(this.particles.length * 0.2),
       delayedParticles: Math.floor(this.particles.length * 0.8),
-      delayedStartTime: (mergedConfig.explosionDuration ?? 0.03) * 0.5,
+      delayedStartTime: (mergedConfig.explosionDuration ?? 0.03) * 0.6,
       settlingBoostDuration: 0.5,
       settlingBoostMultiplier: 2.0
     });

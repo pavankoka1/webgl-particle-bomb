@@ -33,10 +33,10 @@ export const GlWorkshop: FC = () => {
 
     const [config, setConfig] = useState<ExplosionConfig>({
         particleCount: 150, // More particles for better bomb effect
-        explosionDuration: 0.5, // Much faster explosion (30ms)
-        explosionForce: 120, // Much stronger force for dramatic bomb effect
-        particleRadiusMin: 4,
-        particleRadiusMax: 16,
+        explosionDuration: 0.6, // Much faster explosion (30ms)
+        explosionForce: 160, // Much stronger force for dramatic bomb effect
+        particleRadiusMin: 6,
+        particleRadiusMax: 14,
         settlingDuration: 6, // Longer settling for more dramatic effect
         swingAmplitude: 80, // Reduced swing for more realistic movement
         fallSpeed: 0.4, // Slightly faster fall
@@ -122,10 +122,12 @@ export const GlWorkshop: FC = () => {
         };
     }, []); // Remove renderer from dependencies since we handle it with useRef
 
-    // Resize canvas whenever display mode changes
+    // Resize canvas & tweak config whenever display mode changes
     useEffect(() => {
         const canvas = ref.current;
         if (!canvas) return;
+
+        // --- Canvas size update ---
         if (displayMode === "mobile") {
             const targetHeight = window.innerHeight * 0.82;
             const targetWidth = targetHeight * IPHONE_ASPECT_RATIO;
@@ -140,6 +142,30 @@ export const GlWorkshop: FC = () => {
                 height: window.innerHeight,
             });
         }
+
+        // --- Explosion config update ---
+        setConfig((prev) => {
+            const BASE_COUNT = 150;
+            const BASE_FORCE = 160;
+            if (displayMode === "web") {
+                return {
+                    ...prev,
+                    particleCount: BASE_COUNT * 2,
+                    explosionForce: BASE_FORCE * 2,
+                    particleRadiusMin: 8,
+                    particleRadiusMax: 16,
+                };
+            }
+            // mobile
+            return {
+                ...prev,
+                particleCount: BASE_COUNT,
+                explosionForce: BASE_FORCE,
+                particleRadiusMin: 6,
+                particleRadiusMax: 14,
+            };
+        });
+
         if (renderer) {
             renderer.resize();
             triggerInitialSequence(renderer);

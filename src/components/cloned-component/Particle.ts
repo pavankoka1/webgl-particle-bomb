@@ -58,12 +58,17 @@ export class Particle {
   delayedEndPosition: { x: number; y: number; z: number } = { x: 0, y: 0, z: 0 };
   perlinOffset: { x: number; y: number; z: number } = { x: 0, y: 0, z: 0 }; // For unique Perlin noise
   swirlIntensity: number = 0;
+  // Control swirl behaviour
+  swirlRadiusFactor: number = 1.0; // Multiplier for swirl radius (1 = default)
+  swirlPaceExponent: number = 1.2; // Exponent for ease-in pace ( >1 starts slower )
+  swirlTotalDuration: number = 0.5; // Total time for swirl phase (seconds)
 
   // Settling phase properties
   settlingDuration: number;
   settlingTime: number = 0;
-  settlingBoostDuration: number = 0.5; // 500ms boost at start of settling
-  settlingBoostMultiplier: number = 2.0; // 2x velocity boost
+  // Disable settling boost – settle with normal physics
+  settlingBoostDuration: number = 0;
+  settlingBoostMultiplier: number = 1.0;
 
   // Physics properties
   velocityX: number = 0;
@@ -169,6 +174,11 @@ export class Particle {
     this.particleType = particleType;
     this.explosionType = explosionType;
 
+    // Adjust explosion duration based on type BEFORE assigning to instance
+    if (this.explosionType === 'center') {
+      explosionDuration *= 0.7; // 30 % quicker
+    }
+
     // Animation timing
     this.explosionDuration = explosionDuration;
     this.settlingDuration = settlingDuration;
@@ -230,11 +240,22 @@ export class Particle {
   ) {
     if (this.explosionType !== 'delayed' || !p0 || !p2) return;
 
-    // Delayed particles start at 50% of explosion time
-    this.delayedStartTime = this.explosionDuration * 0.7;
+    // Ensure delayed particles have enough time to swirl visibly
+    // const MIN_DELAYED_DURATION = 0.6; // seconds
+    // if (this.explosionDuration < MIN_DELAYED_DURATION) {
+    //   this.explosionDuration = MIN_DELAYED_DURATION;
+    // }
+
+    // Custom timing for delayed-particle swirl
+    this.delayedStartTime = this.explosionDuration * 0.5; // appear after 25 % of explosion
+    this.swirlTotalDuration = this.explosionDuration - this.delayedStartTime; // swirl during last 75 %
+
+    // Make swirl bolder for delayed particles
+    this.swirlRadiusFactor = this.particleType === 'leaf' ? 2.2 : 1.4;
+    this.swirlPaceExponent = 1.0; // linear pace for clearer motion
 
     // Calculate positions at 80% of path and final destination
-    const startProgress = 0.75; // 80% of the way
+    const startProgress = 0.4; // 20% of the path (closer to center for bigger travel)
     this.delayedStartPosition = {
       x: p0.x + (p2.x - p0.x) * startProgress,
       y: p0.y + (p2.y - p0.y) * startProgress,
@@ -333,8 +354,9 @@ export class Particle {
     const dz = this.delayedEndPosition.z - this.delayedStartPosition.z;
     const distance = Math.sqrt(dx * dx + dy * dy + dz * dz);
 
-    // Apply swirl intensity
-    const swirlRadius = distance * 0.3 * this.swirlIntensity;
+    // Apply swirl intensity and configurable radius factor with ease-in
+    const baseRadius = distance * 0.3 * this.swirlIntensity * this.swirlRadiusFactor;
+    const swirlRadius = baseRadius * Math.pow(progress, this.swirlPaceExponent);
 
     return {
       x: noiseX * swirlRadius,
@@ -462,7 +484,7 @@ export class Particle {
   // NEW: Calculate ease-out (slow start – fast end) velocity during explosion
   private getExplosionVelocity(progress: number): { x: number; y: number; z: number } {
     // Quadratic ease-out  → starts slow, ends fast
-    const easeOutProgress = Math.pow(1 - progress, 2);
+    const easeOutProgress = Math.pow(1 - progress, 1.5);
     // const easeOutProgress = progress;
     // const easeOutProgress = 1 - Math.pow(progress, 2);
 
@@ -559,24 +581,50 @@ export class Particle {
         this.rotationZ += this.rotationSpeedZ * this.explosionRotationMultiplier * SPIN_BASE_SPEED;
 
         // Enhanced wobble effect during explosion
-        this.sy = Math.sin(explosionProgress * Math.PI * 10) * 0.25 + 1;
+        // this.sy = Math.sin(explosionProgress * Math.PI * 10) * 0.25 + 1;
 
       } else {
         // DELAYED PARTICLES (80%): Appear at 50% time, swirl to destination
         if (this.phaseTime >= this.delayedStartTime) {
           // Particle becomes visible and starts swirling
-          const delayedProgress = (this.phaseTime - this.delayedStartTime) / (this.explosionDuration - this.delayedStartTime);
-          const swirlProgress = Math.min(1, delayedProgress);
+          const swirlProgress = Math.min(
+            1,
+            (this.phaseTime - this.delayedStartTime) / this.swirlTotalDuration
+          );
+          // Ease-in/out for translation pace along path (use swirlPaceExponent)
+          // const easedProgress = swirlProgress < 0.5
+          //   ? 2 * swirlProgress * swirlProgress // ease-in
+          //   : 1 - Math.pow(-2 * swirlProgress + 2, 2) / 2; // ease-out
+          // const easedProgress = Math.pow(swirlProgress, 2);
+          // const easedProgress = 1 - Math.pow(1 - swirlProgress, 1.1);
+          const easedProgress = swirlProgress
 
           // Calculate position from delayed start to end with Perlin swirl
           const swirlOffset = this.getSwirlOffset(swirlProgress);
 
-          this.centerX = this.delayedStartPosition.x + (this.delayedEndPosition.x - this.delayedStartPosition.x) * swirlProgress + swirlOffset.x;
-          this.centerY = this.delayedStartPosition.y + (this.delayedEndPosition.y - this.delayedStartPosition.y) * swirlProgress + swirlOffset.y;
-          this.centerZ = this.delayedStartPosition.z + (this.delayedEndPosition.z - this.delayedStartPosition.z) * swirlProgress + swirlOffset.z;
+          // Spring-like overshoot along trajectory (10 % overshoot)
+          const overshootFactor = 0; // 10 % past destination
+          const springScale = Math.sin(swirlProgress * Math.PI) * overshootFactor;
+
+          const dx = this.delayedEndPosition.x - this.delayedStartPosition.x;
+          const dy = this.delayedEndPosition.y - this.delayedStartPosition.y;
+          const dz = this.delayedEndPosition.z - this.delayedStartPosition.z;
+
+          this.centerX =
+            this.delayedStartPosition.x +
+            dx * (easedProgress + springScale) +
+            swirlOffset.x;
+          this.centerY =
+            this.delayedStartPosition.y +
+            dy * (easedProgress + springScale) +
+            swirlOffset.y;
+          this.centerZ =
+            this.delayedStartPosition.z +
+            dz * (easedProgress + springScale * 0.5) + // half overshoot on Z
+            swirlOffset.z;
 
           // Enhanced rotation during swirl
-          const swirlRotationSpeed = 2;
+          const swirlRotationSpeed = 0.5;
           this.rotationX += this.rotationSpeedX * swirlRotationSpeed;
           this.rotationY += this.rotationSpeedY * swirlRotationSpeed;
           this.rotationZ += this.rotationSpeedZ * swirlRotationSpeed;
@@ -737,8 +785,9 @@ export class Particle {
       const explosionProgress = Math.min(1, this.phaseTime / this.explosionDuration);
 
       if (this.explosionType === 'center') {
-        // CENTER PARTICLES (20%): Visible immediately during explosion
-        return 1.0;
+        // CENTER PARTICLES: very subtle blur (10 % of previous)
+        const CENTER_BLUR_ALPHA_FACTOR = 0.9;
+        return CENTER_BLUR_ALPHA_FACTOR;
       } else {
         // DELAYED PARTICLES (80%): Invisible for first 50% of explosion time
         if (this.phaseTime < this.delayedStartTime) {
@@ -747,7 +796,9 @@ export class Particle {
           // Fade in quickly once visible
           const delayedProgress = (this.phaseTime - this.delayedStartTime) / (this.explosionDuration - this.delayedStartTime);
           const fadeInProgress = Math.min(1, delayedProgress / 0.1); // Quick fade in over 10% of remaining time
-          return fadeInProgress;
+          // Lower alpha for delayed particles to enhance motion blur trails
+          const BLUR_ALPHA_FACTOR = 0.8;
+          return fadeInProgress * BLUR_ALPHA_FACTOR;
         }
       }
     }
