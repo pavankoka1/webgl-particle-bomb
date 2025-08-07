@@ -33,7 +33,7 @@ export const GlWorkshop: FC = () => {
 
     const [config, setConfig] = useState<ExplosionConfig>({
         particleCount: 150, // More particles for better bomb effect
-        explosionDuration: 0.6, // Much faster explosion (30ms)
+        explosionDuration: 0.44, // Much faster explosion (30ms)
         explosionForce: 160, // Much stronger force for dramatic bomb effect
         particleRadiusMin: 6,
         particleRadiusMax: 14,

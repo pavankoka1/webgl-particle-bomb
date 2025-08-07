@@ -175,9 +175,9 @@ export class Particle {
     this.explosionType = explosionType;
 
     // Adjust explosion duration based on type BEFORE assigning to instance
-    if (this.explosionType === 'center') {
-      explosionDuration *= 0.7; // 30 % quicker
-    }
+    // if (this.explosionType === 'center') {
+    //   explosionDuration *= 0.7; // 30 % quicker
+    // }
 
     // Animation timing
     this.explosionDuration = explosionDuration;
@@ -595,9 +595,9 @@ export class Particle {
           // const easedProgress = swirlProgress < 0.5
           //   ? 2 * swirlProgress * swirlProgress // ease-in
           //   : 1 - Math.pow(-2 * swirlProgress + 2, 2) / 2; // ease-out
-          // const easedProgress = Math.pow(swirlProgress, 2);
+          const easedProgress = Math.pow(swirlProgress, 1.1);
           // const easedProgress = 1 - Math.pow(1 - swirlProgress, 1.1);
-          const easedProgress = swirlProgress
+          // const easedProgress = swirlProgress
 
           // Calculate position from delayed start to end with Perlin swirl
           const swirlOffset = this.getSwirlOffset(swirlProgress);
@@ -630,7 +630,7 @@ export class Particle {
           this.rotationZ += this.rotationSpeedZ * swirlRotationSpeed;
 
           // Wobble effect during swirl
-          // this.sy = Math.sin(swirlProgress * Math.PI * 20) * 0.2 + 0.8;
+          this.sy = Math.sin(swirlProgress * Math.PI * 0) * 0.2 + 1;
 
           // Debug logging for first few delayed particles
           if (Math.random() < 0.01) { // 1% chance to log
