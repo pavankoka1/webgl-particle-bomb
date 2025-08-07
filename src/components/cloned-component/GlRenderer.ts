@@ -332,6 +332,9 @@ export class GlRenderer {
     const startZ = -diagonal * 4.0; // Even deeper Z start for more dramatic approach
 
     for (let i = 0; i < (mergedConfig.particleCount ?? 300); i++) {
+      // NEW: Determine explosion type (20% center, 80% delayed)
+      const explosionType: 'center' | 'delayed' = Math.random() < 0.4 ? 'center' : 'delayed';
+
       // Generate random starting position around the explosion center at deep Z
       const startRadius = diagonal * 0.005; // Very tight stream for focused explosion
       const startAngle = Math.random() * 2 * Math.PI;
@@ -354,10 +357,7 @@ export class GlRenderer {
       const approachVelocityY = normY * approachSpeed;
       const approachVelocityZ = normZ * approachSpeed;
 
-      // --- REVERT: Restore original explosion velocity logic ---
       // Calculate explosion scatter with more realistic physics
-      // RECTANGULAR EXPLOSION: Use rectangular distribution instead of circular
-      // This makes particles explode diagonally to better fill the rectangular screen
       const aspectRatio = canvasWidth / canvasHeight;
 
       // Generate random position within a rectangle that matches screen aspect ratio
@@ -484,7 +484,8 @@ export class GlRenderer {
           mergedConfig.windStrength ?? 0.0,
           mergedConfig.windDirection ?? 0.0,
           fadeInExplosion,
-          mergedConfig.mode === 'bonus' ? 1.0 : 0.0 // Mode: 0 = jackpot, 1 = bonus
+          mergedConfig.mode === 'bonus' ? 1.0 : 0.0, // Mode: 0 = jackpot, 1 = bonus
+          explosionType // NEW: Pass explosion type
         )
       );
     }
@@ -503,6 +504,13 @@ export class GlRenderer {
       defaultRoughness: mergedConfig.mode === 'jackpot' ? (mergedConfig.roughness ?? 0.2) : 0.6,
       depthRange: '1.5-2.5 (like sample)',
       shapeScaling: '15.0x (extreme like sample)'
+    });
+    console.log('🔄 NEW EXPLOSION LOGIC:', {
+      centerParticles: Math.floor(this.particles.length * 0.2),
+      delayedParticles: Math.floor(this.particles.length * 0.8),
+      delayedStartTime: (mergedConfig.explosionDuration ?? 0.03) * 0.5,
+      settlingBoostDuration: 0.5,
+      settlingBoostMultiplier: 2.0
     });
   }
 

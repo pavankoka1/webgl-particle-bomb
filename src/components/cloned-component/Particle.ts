@@ -25,6 +25,9 @@ export class Particle {
   phase: 'approach' | 'explosion' | 'settling' = 'approach';
   phaseTime: number = 0;
 
+  // NEW: Explosion type classification
+  explosionType: 'center' | 'delayed' = 'center'; // 20% center, 80% delayed
+
   // Explosion phase properties
   explosionDuration: number;
   explosionVelocityX: number = 0;
@@ -49,9 +52,18 @@ export class Particle {
   trajectoryDirection: { x: number; y: number; z: number } = { x: 0, y: 0, z: 0 };
   trajectoryLength: number = 0;
 
+  // NEW: Delayed explosion properties
+  delayedStartTime: number = 0; // When delayed particle becomes visible
+  delayedStartPosition: { x: number; y: number; z: number } = { x: 0, y: 0, z: 0 };
+  delayedEndPosition: { x: number; y: number; z: number } = { x: 0, y: 0, z: 0 };
+  perlinOffset: { x: number; y: number; z: number } = { x: 0, y: 0, z: 0 }; // For unique Perlin noise
+  swirlIntensity: number = 0;
+
   // Settling phase properties
   settlingDuration: number;
   settlingTime: number = 0;
+  settlingBoostDuration: number = 0.5; // 500ms boost at start of settling
+  settlingBoostMultiplier: number = 2.0; // 2x velocity boost
 
   // Physics properties
   velocityX: number = 0;
@@ -83,6 +95,18 @@ export class Particle {
   p0?: { x: number; y: number; z: number };
   p1?: { x: number; y: number; z: number };
   p2?: { x: number; y: number; z: number };
+
+  // NEW: Perlin noise permutation table
+  private static readonly PERLIN_PERMUTATION: number[] = [
+    151, 160, 137, 91, 90, 15, 131, 13, 201, 95, 96, 53, 194, 233, 7, 225, 140, 36, 103, 30, 69, 142, 8, 99, 37, 240, 21, 10, 23,
+    190, 6, 148, 247, 120, 234, 75, 0, 26, 197, 62, 94, 252, 219, 203, 117, 35, 11, 32, 57, 177, 33, 88, 237, 149, 56, 87, 174, 20, 125, 136, 171, 168,
+    68, 175, 74, 165, 71, 134, 139, 48, 27, 166, 77, 146, 158, 231, 83, 111, 229, 122, 60, 211, 133, 230, 220, 105, 92, 41, 55, 46, 245, 40, 244,
+    102, 143, 54, 65, 25, 63, 161, 1, 216, 80, 73, 209, 76, 132, 187, 208, 89, 18, 169, 200, 196, 135, 130, 116, 188, 159, 86, 164, 100, 109, 198, 173, 186,
+    3, 64, 52, 217, 226, 250, 124, 123, 5, 202, 38, 147, 118, 126, 255, 82, 85, 212, 207, 206, 59, 227, 47, 16, 58, 17, 182, 189, 28, 42, 223, 183, 170, 213,
+    119, 248, 152, 2, 44, 154, 163, 70, 221, 153, 101, 155, 167, 43, 172, 9, 129, 22, 39, 253, 19, 98, 108, 110, 79, 113, 224, 232, 178, 185, 112, 104, 218, 246, 97, 228,
+    251, 34, 242, 193, 238, 210, 144, 12, 191, 179, 162, 241, 81, 51, 145, 235, 249, 14, 239, 107, 49, 192, 214, 31, 181, 199, 106, 157, 184, 84, 204, 176, 115, 121, 50, 45, 127, 4, 150, 254,
+    138, 236, 205, 93, 222, 114, 67, 29, 24, 72, 243, 141, 128, 195, 78, 66, 215, 61, 156, 180
+  ];
 
   constructor(
     centerX: number,
@@ -122,7 +146,8 @@ export class Particle {
     windStrength: number = 0.0,
     windDirection: number = 0.0,
     fadeInExplosion: boolean = false,
-    mode: number = 0
+    mode: number = 0,
+    explosionType: 'center' | 'delayed' = 'center'
   ) {
     this.centerX = centerX;
     this.centerY = centerY;
@@ -142,6 +167,7 @@ export class Particle {
     this.life = life;
     this.maxLife = life;
     this.particleType = particleType;
+    this.explosionType = explosionType;
 
     // Animation timing
     this.explosionDuration = explosionDuration;
@@ -158,6 +184,9 @@ export class Particle {
     this.windDirection = windDirection;
     this.fadeInExplosion = fadeInExplosion;
     this.mode = mode;
+
+    // NEW: Setup delayed explosion properties
+    this.setupDelayedExplosion(p0, p1, p2, p3, explosionScatter);
 
     // NEW: Enhanced explosion setup
     this.setupEnhancedExplosion(p0, p1, p2, p3, explosionScatter);
@@ -189,6 +218,129 @@ export class Particle {
     this.approachTargetZ = approachTargetZ;
     this.approachSpeed = approachSpeed;
     this.explosionScatter = explosionScatter;
+  }
+
+  // NEW: Setup delayed explosion properties
+  private setupDelayedExplosion(
+    p0?: { x: number; y: number; z: number },
+    p1?: { x: number; y: number; z: number },
+    p2?: { x: number; y: number; z: number },
+    p3?: { x: number; y: number; z: number },
+    explosionScatter?: { x: number; y: number; z: number } | null
+  ) {
+    if (this.explosionType !== 'delayed' || !p0 || !p2) return;
+
+    // Delayed particles start at 50% of explosion time
+    this.delayedStartTime = this.explosionDuration * 0.7;
+
+    // Calculate positions at 80% of path and final destination
+    const startProgress = 0.75; // 80% of the way
+    this.delayedStartPosition = {
+      x: p0.x + (p2.x - p0.x) * startProgress,
+      y: p0.y + (p2.y - p0.y) * startProgress,
+      z: p0.z + (p2.z - p0.z) * startProgress
+    };
+
+    this.delayedEndPosition = {
+      x: p2.x,
+      y: p2.y,
+      z: p2.z
+    };
+
+    // Unique Perlin noise offset for each particle
+    this.perlinOffset = {
+      x: Math.random() * 1000,
+      y: Math.random() * 1000,
+      z: Math.random() * 1000
+    };
+
+    // Swirl intensity based on particle type
+    this.swirlIntensity = this.particleType === 'leaf' ? 0.8 : 0.4;
+  }
+
+  // NEW: Perlin noise implementation
+  private fade(t: number): number {
+    return t * t * t * (t * (t * 6 - 15) + 10);
+  }
+
+  private lerp(t: number, a: number, b: number): number {
+    return a + t * (b - a);
+  }
+
+  private grad(hash: number, x: number, y: number, z: number): number {
+    const h = hash & 15;
+    const u = h < 8 ? x : y;
+    const v = h < 4 ? y : h === 12 || h === 14 ? x : z;
+    return ((h & 1) === 0 ? u : -u) + ((h & 2) === 0 ? v : -v);
+  }
+
+  private noise(x: number, y: number, z: number): number {
+    const X = Math.floor(x) & 255;
+    const Y = Math.floor(y) & 255;
+    const Z = Math.floor(z) & 255;
+
+    x -= Math.floor(x);
+    y -= Math.floor(y);
+    z -= Math.floor(z);
+
+    const u = this.fade(x);
+    const v = this.fade(y);
+    const w = this.fade(z);
+
+    const A = Particle.PERLIN_PERMUTATION[X] + Y;
+    const AA = Particle.PERLIN_PERMUTATION[A] + Z;
+    const AB = Particle.PERLIN_PERMUTATION[A + 1] + Z;
+    const B = Particle.PERLIN_PERMUTATION[X + 1] + Y;
+    const BA = Particle.PERLIN_PERMUTATION[B] + Z;
+    const BB = Particle.PERLIN_PERMUTATION[B + 1] + Z;
+
+    return this.lerp(w, this.lerp(v, this.lerp(u, this.grad(Particle.PERLIN_PERMUTATION[AA], x, y, z),
+      this.grad(Particle.PERLIN_PERMUTATION[BA], x - 1, y, z)),
+      this.lerp(u, this.grad(Particle.PERLIN_PERMUTATION[AB], x, y - 1, z),
+        this.grad(Particle.PERLIN_PERMUTATION[BB], x - 1, y - 1, z))),
+      this.lerp(v, this.lerp(u, this.grad(Particle.PERLIN_PERMUTATION[AA + 1], x, y, z - 1),
+        this.grad(Particle.PERLIN_PERMUTATION[BA + 1], x - 1, y, z - 1)),
+        this.lerp(u, this.grad(Particle.PERLIN_PERMUTATION[AB + 1], x, y - 1, z - 1),
+          this.grad(Particle.PERLIN_PERMUTATION[BB + 1], x - 1, y - 1, z - 1))));
+  }
+
+  // NEW: Calculate Perlin noise-based swirl offset
+  private getSwirlOffset(progress: number): { x: number; y: number; z: number } {
+    const time = progress * 10; // Scale time for more swirls
+    const noiseScale = 0.1;
+
+    const noiseX = this.noise(
+      (this.perlinOffset.x + time) * noiseScale,
+      this.perlinOffset.y * noiseScale,
+      this.perlinOffset.z * noiseScale
+    );
+
+    const noiseY = this.noise(
+      this.perlinOffset.x * noiseScale,
+      (this.perlinOffset.y + time) * noiseScale,
+      this.perlinOffset.z * noiseScale
+    );
+
+    const noiseZ = this.noise(
+      this.perlinOffset.x * noiseScale,
+      this.perlinOffset.y * noiseScale,
+      (this.perlinOffset.z + time) * noiseScale
+    );
+
+    // Calculate distance from start to end
+    const dx = this.delayedEndPosition.x - this.delayedStartPosition.x;
+    const dy = this.delayedEndPosition.y - this.delayedStartPosition.y;
+    const dz = this.delayedEndPosition.z - this.delayedStartPosition.z;
+    const distance = Math.sqrt(dx * dx + dy * dy + dz * dz);
+
+    // Apply swirl intensity
+    const swirlRadius = distance * 0.3 * this.swirlIntensity;
+
+    return {
+      x: noiseX * swirlRadius,
+      y: noiseY * swirlRadius,
+      z: noiseZ * swirlRadius * 0.5 // Less Z swirl
+    };
   }
 
   // NEW: Setup enhanced explosion with gun-like effect
@@ -256,7 +408,7 @@ export class Particle {
     // --- SPIN parameters you can TWEAK easily ---
     const MIN_SPIN_MULTIPLIER = 5;
     const MAX_SPIN_MULTIPLIER = 10;
-    const SPIN_BASE_SPEED = 0.1;   // degrees added per frame-step
+    const SPIN_BASE_SPEED = 1;   // degrees added per frame-step
     // Reduced spin to a more reasonable range
     this.explosionRotationMultiplier =
       (MIN_SPIN_MULTIPLIER + Math.random() * (MAX_SPIN_MULTIPLIER - MIN_SPIN_MULTIPLIER)) * 0.01;
@@ -310,9 +462,9 @@ export class Particle {
   // NEW: Calculate ease-out (slow start – fast end) velocity during explosion
   private getExplosionVelocity(progress: number): { x: number; y: number; z: number } {
     // Quadratic ease-out  → starts slow, ends fast
-    // const easeOutProgress = Math.pow(1 - progress, 2);
+    const easeOutProgress = Math.pow(1 - progress, 2);
     // const easeOutProgress = progress;
-    const easeOutProgress = 1 - Math.pow(progress, 2);
+    // const easeOutProgress = 1 - Math.pow(progress, 2);
 
     return {
       x:
@@ -378,54 +530,125 @@ export class Particle {
     }
 
     if (this.phase === 'explosion') {
-      // ENHANCED EXPLOSION PHASE: Spiral trajectory with extreme rotation
+      // ENHANCED EXPLOSION PHASE: Handle both center and delayed particles
       this.phaseTime += timeStep;
       const explosionProgress = Math.min(1, this.phaseTime / this.explosionDuration);
 
-      // Calculate ease-in velocity
-      const currentVelocity = this.getExplosionVelocity(explosionProgress);
+      if (this.explosionType === 'center') {
+        // CENTER PARTICLES (20%): Normal explosion from center
+        // Calculate ease-in velocity
+        const currentVelocity = this.getExplosionVelocity(explosionProgress);
 
-      // Calculate spiral offset around trajectory
-      const spiralOffset = this.getSpiralOffset(explosionProgress);
+        // Calculate spiral offset around trajectory
+        const spiralOffset = this.getSpiralOffset(explosionProgress);
 
-      // Update position with ease-in velocity and spiral trajectory
-      this.centerX += (currentVelocity.x + spiralOffset.x) * timeStep;
-      this.centerY += (currentVelocity.y + spiralOffset.y) * timeStep;
-      this.centerZ += (currentVelocity.z + spiralOffset.z) * timeStep;
+        // Update position with ease-in velocity and spiral trajectory
+        this.centerX += (currentVelocity.x + spiralOffset.x) * timeStep;
+        this.centerY += (currentVelocity.y + spiralOffset.y) * timeStep;
+        this.centerZ += (currentVelocity.z + spiralOffset.z) * timeStep;
 
-      // Prevent particles from crossing the camera plane (Z > 0)
-      if (this.centerZ > -50) {
-        this.centerZ = -50; // stop 50px in front of camera
+        // Prevent particles from crossing the camera plane (Z > 0)
+        if (this.centerZ > -50) {
+          this.centerZ = -50; // stop 50px in front of camera
+        }
+
+        // Controlled rotation (spin) during explosion
+        const SPIN_BASE_SPEED = 10;
+        this.rotationX += this.rotationSpeedX * this.explosionRotationMultiplier * SPIN_BASE_SPEED;
+        this.rotationY += this.rotationSpeedY * this.explosionRotationMultiplier * SPIN_BASE_SPEED;
+        this.rotationZ += this.rotationSpeedZ * this.explosionRotationMultiplier * SPIN_BASE_SPEED;
+
+        // Enhanced wobble effect during explosion
+        this.sy = Math.sin(explosionProgress * Math.PI * 10) * 0.25 + 1;
+
+      } else {
+        // DELAYED PARTICLES (80%): Appear at 50% time, swirl to destination
+        if (this.phaseTime >= this.delayedStartTime) {
+          // Particle becomes visible and starts swirling
+          const delayedProgress = (this.phaseTime - this.delayedStartTime) / (this.explosionDuration - this.delayedStartTime);
+          const swirlProgress = Math.min(1, delayedProgress);
+
+          // Calculate position from delayed start to end with Perlin swirl
+          const swirlOffset = this.getSwirlOffset(swirlProgress);
+
+          this.centerX = this.delayedStartPosition.x + (this.delayedEndPosition.x - this.delayedStartPosition.x) * swirlProgress + swirlOffset.x;
+          this.centerY = this.delayedStartPosition.y + (this.delayedEndPosition.y - this.delayedStartPosition.y) * swirlProgress + swirlOffset.y;
+          this.centerZ = this.delayedStartPosition.z + (this.delayedEndPosition.z - this.delayedStartPosition.z) * swirlProgress + swirlOffset.z;
+
+          // Enhanced rotation during swirl
+          const swirlRotationSpeed = 2;
+          this.rotationX += this.rotationSpeedX * swirlRotationSpeed;
+          this.rotationY += this.rotationSpeedY * swirlRotationSpeed;
+          this.rotationZ += this.rotationSpeedZ * swirlRotationSpeed;
+
+          // Wobble effect during swirl
+          // this.sy = Math.sin(swirlProgress * Math.PI * 20) * 0.2 + 0.8;
+
+          // Debug logging for first few delayed particles
+          if (Math.random() < 0.01) { // 1% chance to log
+            console.log('🌀 Delayed particle swirling:', {
+              progress: swirlProgress,
+              position: { x: this.centerX, y: this.centerY, z: this.centerZ },
+              swirlOffset: swirlOffset,
+              type: this.particleType
+            });
+          }
+        } else {
+          // If not yet visible, particle stays at explosion center
+          if (Math.random() < 0.01) { // 1% chance to log
+            console.log('⏳ Delayed particle waiting:', {
+              phaseTime: this.phaseTime,
+              delayedStartTime: this.delayedStartTime,
+              remaining: this.delayedStartTime - this.phaseTime
+            });
+          }
+        }
       }
-
-      // Controlled rotation (spin) during explosion – adjust via MIN/MAX_SPIN_MULTIPLIER above
-      // Finer self-spin control – make it easy to adjust from one constant
-      const SPIN_BASE_SPEED = 5;  // lower = less self rotation
-      this.rotationX += this.rotationSpeedX * this.explosionRotationMultiplier * SPIN_BASE_SPEED;
-      this.rotationY += this.rotationSpeedY * this.explosionRotationMultiplier * SPIN_BASE_SPEED;
-      this.rotationZ += this.rotationSpeedZ * this.explosionRotationMultiplier * SPIN_BASE_SPEED;
-
-      // Enhanced wobble effect during explosion
-      this.sy = Math.sin(explosionProgress * Math.PI * 50) * 0.4 + 0.6; // More dramatic wobble
 
       // Check if explosion phase is complete
       if (this.phaseTime >= this.explosionDuration) {
         this.phase = 'settling';
         this.settlingTime = 0;
-        // Dampen velocity for more realistic settling
-        const damp = this.particleType === 'leaf' ? 0.2 : 0.6;
-        this.velocityX *= damp;
-        this.velocityY *= damp;
-        this.velocityZ *= damp;
-        console.log('💥 Particle explosion complete, entering settling phase');
+
+        // Enhanced settling velocity boost for first 500ms
+        const settlingBoost = this.settlingBoostMultiplier;
+        this.velocityX *= settlingBoost;
+        this.velocityY *= settlingBoost;
+        this.velocityZ *= settlingBoost;
+
+        console.log('💥 Particle explosion complete, entering settling phase with velocity boost');
+        console.log('🚀 Settling boost applied:', {
+          type: this.explosionType,
+          particleType: this.particleType,
+          boostMultiplier: settlingBoost,
+          newVelocity: { x: this.velocityX, y: this.velocityY, z: this.velocityZ }
+        });
       }
     } else {
       // SETTLING PHASE: Particles fall due to gravity with enhanced swing motion
       this.settlingTime += timeStep;
       this.swingPhase += this.swingFrequency * timeStep;
 
+      // Apply velocity boost for first 500ms of settling
+      let velocityMultiplier = 1.0;
+      if (this.settlingTime < this.settlingBoostDuration) {
+        const boostProgress = this.settlingTime / this.settlingBoostDuration;
+        const boostEaseOut = 1 - Math.pow(boostProgress, 2); // Ease out the boost
+        velocityMultiplier = 1.0 + (this.settlingBoostMultiplier - 1.0) * boostEaseOut;
+
+        // Debug logging for settling boost (1% chance)
+        if (Math.random() < 0.01) {
+          console.log('⚡ Settling boost active:', {
+            settlingTime: this.settlingTime,
+            boostProgress: boostProgress,
+            velocityMultiplier: velocityMultiplier,
+            type: this.particleType
+          });
+        }
+      }
+
       // Apply gravity (reduced for slower fall)
-      this.velocityY += this.gravity * this.fallSpeed;
+      this.velocityY += this.gravity * this.fallSpeed * velocityMultiplier;
 
       // Configurable wind effect
       const windX = Math.cos(this.windDirection) * this.windStrength;
@@ -436,10 +659,10 @@ export class Particle {
       const swingY = Math.cos(this.swingPhase * 0.7) * this.swingAmplitude * 0.01;
       const swingZ = Math.sin(this.swingPhase * 0.5) * this.swingAmplitude * 0.001;
 
-      // Apply wind and swing forces
-      this.velocityX += windX + swingX;
-      this.velocityY += windY + swingY;
-      this.velocityZ += swingZ;
+      // Apply wind and swing forces with velocity boost
+      this.velocityX += (windX + swingX) * velocityMultiplier;
+      this.velocityY += (windY + swingY) * velocityMultiplier;
+      this.velocityZ += swingZ * velocityMultiplier;
 
       // Apply air resistance (more realistic for thin particles)
       this.velocityX *= this.airResistance;
@@ -513,18 +736,19 @@ export class Particle {
     if (this.phase === 'explosion') {
       const explosionProgress = Math.min(1, this.phaseTime / this.explosionDuration);
 
-      // Handle different fade-in types based on timing requirements
-      if (this.opacityFadeType === 'immediate') {
-        // 70% of particles: start visible immediately
+      if (this.explosionType === 'center') {
+        // CENTER PARTICLES (20%): Visible immediately during explosion
         return 1.0;
-      } else if (this.opacityFadeType === 'delayed') {
-        // 20% of particles: fade in by 50% of explosion
-        const fadeProgress = Math.min(1, explosionProgress / 0.5);
-        return fadeProgress;
       } else {
-        // 10% of particles: fade in by 80% of explosion
-        const fadeProgress = Math.min(1, explosionProgress / 0.8);
-        return fadeProgress;
+        // DELAYED PARTICLES (80%): Invisible for first 50% of explosion time
+        if (this.phaseTime < this.delayedStartTime) {
+          return 0.0; // Completely invisible
+        } else {
+          // Fade in quickly once visible
+          const delayedProgress = (this.phaseTime - this.delayedStartTime) / (this.explosionDuration - this.delayedStartTime);
+          const fadeInProgress = Math.min(1, delayedProgress / 0.1); // Quick fade in over 10% of remaining time
+          return fadeInProgress;
+        }
       }
     }
 
