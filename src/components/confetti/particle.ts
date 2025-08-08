@@ -239,8 +239,8 @@ export class Particle {
             // Calculate initial explosion velocity (from p0 to p2)
             const explosionDistance = Math.sqrt(
                 Math.pow(p2.x - p0.x, 2) +
-                    Math.pow(p2.y - p0.y, 2) +
-                    Math.pow(p2.z - p0.z, 2)
+                Math.pow(p2.y - p0.y, 2) +
+                Math.pow(p2.z - p0.z, 2)
             );
 
             this.explosionVelocityX = (p2.x - p0.x) / explosionDuration;
@@ -461,8 +461,8 @@ export class Particle {
         // Normalize direction
         const length = Math.sqrt(
             this.trajectoryDirection.x * this.trajectoryDirection.x +
-                this.trajectoryDirection.y * this.trajectoryDirection.y +
-                this.trajectoryDirection.z * this.trajectoryDirection.z
+            this.trajectoryDirection.y * this.trajectoryDirection.y +
+            this.trajectoryDirection.z * this.trajectoryDirection.z
         );
 
         this.trajectoryLength = length;
@@ -601,15 +601,15 @@ export class Particle {
             x:
                 this.explosionStartVelocity.x +
                 (this.explosionEndVelocity.x - this.explosionStartVelocity.x) *
-                    easeOutProgress,
+                easeOutProgress,
             y:
                 this.explosionStartVelocity.y +
                 (this.explosionEndVelocity.y - this.explosionStartVelocity.y) *
-                    easeOutProgress,
+                easeOutProgress,
             z:
                 this.explosionStartVelocity.z +
                 (this.explosionEndVelocity.z - this.explosionStartVelocity.z) *
-                    easeOutProgress,
+                easeOutProgress,
         };
     }
 
@@ -721,13 +721,12 @@ export class Particle {
                     const swirlProgress = Math.min(
                         1,
                         (this.phaseTime - this.delayedStartTime) /
-                            this.swirlTotalDuration
+                        this.swirlTotalDuration
                     );
                     // Ease-in/out for translation pace along path (use swirlPaceExponent)
-                    const easedProgress =
-                        swirlProgress < 0.5
-                            ? 2 * swirlProgress * swirlProgress // ease-in
-                            : 1 - Math.pow(-2 * swirlProgress + 2, 2) / 2; // ease-out
+                    const easedProgress = swirlProgress < 0.5
+                        ? 2 * swirlProgress * swirlProgress // ease-in
+                        : 1 - Math.pow(-2 * swirlProgress + 2, 2) / 2; // ease-out
                     // const easedProgress = Math.pow(swirlProgress, 1.1);
                     // const easedProgress = 1 - Math.pow(1 - swirlProgress, 1.1);
                     // const easedProgress = swirlProgress
